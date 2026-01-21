@@ -14,8 +14,12 @@
     "dev:all": "npm run dev --workspaces --if-present --parallel",
     "test": "npm run test --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
+    "lint:fix": "npm run lint --workspaces --if-present -- --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "clean": "rimraf packages/*/dist example/dist",
-    "typecheck": "tsc --noEmit -p packages/core && tsc --noEmit -p packages/runtime"
+    "typecheck": "tsc --noEmit -p packages/core && tsc --noEmit -p packages/runtime",
+    "ci": "npm ci && npm run lint && npm run typecheck && npm test && npm run build"
   },
   "keywords": [
     "shader",
@@ -35,6 +39,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
+    "prettier": "^3.0.0",
     "rimraf": "^5.0.0",
     "typescript": "^5.3.0"
   },

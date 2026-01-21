@@ -36,6 +36,10 @@
         "url": "https://github.com/shader3d/shader3d.git",
         "directory": "packages/runtime"
     },
+    "bugs": {
+        "url": "https://github.com/shader3d/shader3d/issues"
+    },
+    "homepage": "https://shader3d.dev",
     "devDependencies": {
         "@types/node": "^20.10.0",
         "@typescript-eslint/eslint-plugin": "^8.0.0",

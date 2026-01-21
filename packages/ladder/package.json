@@ -42,6 +42,10 @@
         "url": "https://github.com/shader3d/shader3d.git",
         "directory": "packages/ladder"
     },
+    "bugs": {
+        "url": "https://github.com/shader3d/shader3d/issues"
+    },
+    "homepage": "https://shader3d.dev",
     "dependencies": {
         "@shader3d/core": "*",
         "@shader3d/runtime": "*"
