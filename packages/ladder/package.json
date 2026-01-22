@@ -1,6 +1,6 @@
 {
     "name": "@shader3d/ladder",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "description": "Progressive learning system for Shader3D",
     "type": "module",
     "main": "./dist/index.js",
@@ -19,7 +19,10 @@
             "import": "./dist/cli.js"
         }
     },
-    "files": ["dist", "src"],
+    "files": [
+        "dist",
+        "src"
+    ],
     "scripts": {
         "build": "tsc",
         "dev": "tsc --watch",

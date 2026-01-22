@@ -1,6 +1,6 @@
 {
     "name": "@shader3d/core",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "description": "Core transpiler and code generation for Shader3D DSL",
     "type": "module",
     "main": "./dist/index.js",
@@ -20,7 +20,10 @@
             "import": "./dist/parser.js"
         }
     },
-    "files": ["dist", "src"],
+    "files": [
+        "dist",
+        "src"
+    ],
     "scripts": {
         "build": "tsc",
         "dev": "tsc --watch",

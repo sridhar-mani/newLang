@@ -1,6 +1,6 @@
 {
     "name": "@shader3d/runtime",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "description": "WebGPU and Three.js runtime for Shader3D",
     "type": "module",
     "main": "./dist/index.js",
@@ -20,14 +20,23 @@
             "import": "./dist/threejs.js"
         }
     },
-    "files": ["dist", "src"],
+    "files": [
+        "dist",
+        "src"
+    ],
     "scripts": {
         "build": "tsc",
         "dev": "tsc --watch",
         "lint": "eslint src --ext .ts",
         "clean": "rimraf dist"
     },
-    "keywords": ["shader", "webgpu", "threejs", "graphics", "runtime"],
+    "keywords": [
+        "shader",
+        "webgpu",
+        "threejs",
+        "graphics",
+        "runtime"
+    ],
     "author": "Shader3D Team",
     "license": "SEE LICENSE IN ../../LICENSE",
     "repository": {
