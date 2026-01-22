@@ -135,7 +135,9 @@ jobs:
                       echo "⚠️  $PKG_NAME@$VERSION already published, skipping"
                     else
                       echo "📦 Publishing $PKG_NAME@$VERSION"
-                      npm publish --access public --provenance --tag ${{ steps.npm_tag.outputs.TAG }}
+                      npm publish --access public --provenance --tag ${{ steps.npm_tag.outputs.TAG }} --registry https://registry.npmjs.org/
                     fi
                     cd ../..
                   done
+              env:
+                  NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
