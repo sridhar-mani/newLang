@@ -49,6 +49,9 @@ jobs:
             - name: Install dependencies
               run: npm ci
 
+            - name: Update package versions
+              run: npm version ${GITHUB_REF#refs/tags/v} --no-git-tag-version --workspaces
+
             - name: Build all packages
               run: npm run build
 
