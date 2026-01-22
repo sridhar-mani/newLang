@@ -63,8 +63,9 @@ jobs:
                   git config user.name "github-actions[bot]"
                   git config user.email "github-actions[bot]@users.noreply.github.com"
 
-                  # Get current version
+                  # Get current version from package
                   CURRENT_VERSION=$(node -p "require('./packages/core/package.json').version")
+                  echo "Current version: $CURRENT_VERSION"
                   IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
                   
                   # Calculate new version with 0-30 cycle logic
@@ -94,17 +95,21 @@ jobs:
                     NEW_VERSION="$((NEW_MAJOR + 1)).0.0"
                   fi
                   
+                  echo "New version: $NEW_VERSION"
                   TAG="v$NEW_VERSION"
 
                   # Check if tag already exists
-                  if git rev-parse "$TAG" >/dev/null 2>&1; then
-                    echo "Tag $TAG already exists, skipping"
+                  if git ls-remote --tags origin | grep -q "refs/tags/$TAG$"; then
+                    echo "⚠️  Tag $TAG already exists on remote, skipping"
                     exit 0
                   fi
 
                   # Manually update all package.json files
+                  echo "Updating package.json files to $NEW_VERSION"
                   for pkg in packages/core packages/runtime packages/vite-plugin packages/ladder; do
-                    node -e "const fs = require('fs'); const pkg = JSON.parse(fs.readFileSync('$pkg/package.json')); pkg.version = '$NEW_VERSION'; fs.writeFileSync('$pkg/package.json', JSON.stringify(pkg, null, 2) + '\n');"
+                    if [ -f "$pkg/package.json" ]; then
+                      node -e "const fs = require('fs'); const pkg = JSON.parse(fs.readFileSync('$pkg/package.json')); pkg.version = '$NEW_VERSION'; fs.writeFileSync('$pkg/package.json', JSON.stringify(pkg, null, 4) + '\n');"
+                    fi
                   done
                   
                   # Update package-lock.json
@@ -112,5 +117,12 @@ jobs:
 
                   git add .
                   git commit -m "chore: bump version to $NEW_VERSION"
+                  
+                  echo "Creating tag $TAG"
                   git tag "$TAG"
-                  git push origin main --tags
+                  
+                  echo "Pushing commit and tag to origin"
+                  git push origin main
+                  git push origin "$TAG"
+                  
+                  echo "✅ Successfully bumped to $NEW_VERSION and pushed tag $TAG"
