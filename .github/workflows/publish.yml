@@ -4,28 +4,6 @@ on:
     push:
         tags:
             - "v*"
-    release:
-        types: [published]
-    workflow_dispatch:
-        inputs:
-            version:
-                description: "Version to publish (e.g., 0.1.0, 0.2.0-beta.1)"
-                required: true
-                type: string
-            tag:
-                description: "npm tag (latest, beta, next)"
-                required: true
-                default: "latest"
-                type: choice
-                options:
-                    - latest
-                    - beta
-                    - next
-            dry-run:
-                description: "Dry run (do not actually publish)"
-                required: false
-                default: false
-                type: boolean
 
 jobs:
     publish:
@@ -52,8 +30,11 @@ jobs:
             - name: Install dependencies
               run: npm ci
 
-            - name: Update package versions
+            - name: Get Version
               run: npm version ${GITHUB_REF#refs/tags/v} --no-git-tag-version --workspaces
+
+            - name: Update Version
+              run: npm version "$VERSION" --no-git-tag-version --workspaces
 
             - name: Build all packages
               run: npm run build
