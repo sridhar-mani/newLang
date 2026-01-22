@@ -11,8 +11,7 @@ jobs:
         runs-on: ubuntu-latest
 
         permissions:
-              contents: write
-              id-token: write
+            contents: write
 
         steps:
             - name: Checkout repository
@@ -92,7 +91,6 @@ jobs:
 
         permissions:
             contents: read
-            id-token: write
 
         steps:
             - name: Checkout repository
@@ -103,7 +101,6 @@ jobs:
               with:
                   node-version: 20.x
                   cache: "npm"
-                  registry-url: "https://registry.npmjs.org"
 
             - name: Install dependencies
               run: npm ci
@@ -140,22 +137,17 @@ jobs:
                       continue
                     fi
                     
-                    # Try publishing with provenance
                     echo "📦 Publishing $PKG_NAME@$VERSION"
-                    if npm publish --access public --provenance --tag ${{ steps.npm_tag.outputs.TAG }} --registry https://registry.npmjs.org/ 2>&1 | tee publish.log; then
+                    npm publish --access public --tag ${{ steps.npm_tag.outputs.TAG }}
+                    
+                    if [ $? -eq 0 ]; then
                       echo "✅ Successfully published $PKG_NAME@$VERSION"
                     else
-                      # Check if it failed due to existing transparency log entry
-                      if grep -q "TLOG_CREATE_ENTRY_ERROR\|already exists in the transparency log" publish.log; then
-                        echo "⚠️  Transparency log entry exists, trying without provenance"
-                        npm publish --access public --tag ${{ steps.npm_tag.outputs.TAG }} --registry https://registry.npmjs.org/
-                      else
-                        echo "❌ Failed to publish $PKG_NAME@$VERSION"
-                        cat publish.log
-                        cd ../..
-                        exit 1
-                      fi
+                      echo "❌ Failed to publish $PKG_NAME@$VERSION"
+                      cd ../..
+                      exit 1
                     fi
-                    rm -f publish.log
                     cd ../..
                   done
+              env:
+                  NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
