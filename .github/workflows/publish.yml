@@ -100,7 +100,7 @@ jobs:
             - name: Dry run summary
               if: ${{ inputs.dry-run }}
               run: |
-                  echo "🔍 DRY RUN - No packages were published"
+                  echo "DRY RUN - No packages were published"
                   echo "Would have published:"
                   echo "  - @shader3d/core"
                   echo "  - @shader3d/runtime"
