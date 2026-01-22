@@ -158,5 +158,3 @@ jobs:
                     rm -f publish.log
                     cd ../..
                   done
-              env:
-                  NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
