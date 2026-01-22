@@ -1,0 +1,31 @@
+{
+    "name": "@shader3d/paint-effects",
+    "version": "0.1.0",
+    "description": "Paint-to-shader effect generation for Shader3D",
+    "type": "module",
+    "main": "./dist/index.js",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "import": "./dist/index.js",
+            "types": "./dist/index.d.ts"
+        }
+    },
+    "scripts": {
+        "build": "tsc",
+        "dev": "tsc --watch",
+        "test": "vitest"
+    },
+    "dependencies": {
+        "@shader3d/core": "workspace:*",
+        "@shader3d/layers": "workspace:*"
+    },
+    "devDependencies": {
+        "typescript": "^5.0.0"
+    },
+    "peerDependencies": {},
+    "keywords": ["shader", "paint", "effects", "gesture", "canvas"],
+    "author": "",
+    "license": "MIT"
+}

@@ -1,235 +1,135 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { initWebGPU, createRenderLoop, type FrameData } from '@shader3d/runtime';
+import { useState } from 'react';
+import { ShaderPlayground } from './components/ShaderPlayground';
+import { LayerEditor } from './components/LayerEditor';
+import { PresetGallery } from './components/PresetGallery';
+import { PaintEffects } from './components/PaintEffects';
+import { NaturalLanguage } from './components/NaturalLanguage';
+import { LearnFromExamples } from './components/LearnFromExamples';
 
-const shaderExamples = {
-  gradient: `@vertex
-fn vs_main(@builtin(vertex_index) vertexIndex: u32) -> @builtin(position) vec4f {
-  var pos = array<vec2f, 3>(
-    vec2f(-1.0, -1.0), vec2f(3.0, -1.0), vec2f(-1.0, 3.0)
-  );
-  return vec4f(pos[vertexIndex], 0.0, 1.0);
+type TabId = 'playground' | 'layers' | 'presets' | 'paint' | 'talk' | 'learn';
+
+interface Tab {
+  id: TabId;
+  label: string;
+  icon: string;
+  description: string;
 }
 
-@fragment
-fn fs_main(@builtin(position) pos: vec4f) -> @location(0) vec4f {
-  let uv = pos.xy / 800.0;
-  return vec4f(uv.x, uv.y, 0.5, 1.0);
-}`,
-  plasma: `@vertex
-fn vs_main(@builtin(vertex_index) vertexIndex: u32) -> @builtin(position) vec4f {
-  var pos = array<vec2f, 3>(
-    vec2f(-1.0, -1.0), vec2f(3.0, -1.0), vec2f(-1.0, 3.0)
-  );
-  return vec4f(pos[vertexIndex], 0.0, 1.0);
-}
-
-@group(0) @binding(0) var<uniform> time: f32;
-
-@fragment
-fn fs_main(@builtin(position) pos: vec4f) -> @location(0) vec4f {
-  let uv = (pos.xy / 600.0) * 2.0 - 1.0;
-  let d = length(uv);
-  let col = 0.5 + 0.5 * cos(d * 10.0 - time + vec3f(0.0, 2.0, 4.0));
-  return vec4f(col, 1.0);
-}`,
-  triangle: `@vertex
-fn vs_main(@builtin(vertex_index) vertexIndex: u32) -> @builtin(position) vec4f {
-  var pos = array<vec2f, 3>(
-    vec2f(0.0, 0.5), vec2f(-0.5, -0.5), vec2f(0.5, -0.5)
-  );
-  return vec4f(pos[vertexIndex], 0.0, 1.0);
-}
-
-@fragment
-fn fs_main() -> @location(0) vec4f {
-  return vec4f(1.0, 0.4, 0.6, 1.0);
-}`,
-};
+const tabs: Tab[] = [
+  { id: 'playground', label: 'Playground', icon: '🎮', description: 'Write shaders in TypeScript' },
+  {
+    id: 'layers',
+    label: 'Effect Layers',
+    icon: '📚',
+    description: 'Photoshop-style effect stacking',
+  },
+  { id: 'presets', label: 'Presets', icon: '✨', description: 'One-click professional effects' },
+  {
+    id: 'paint',
+    label: 'Paint Effects',
+    icon: '🎨',
+    description: 'Draw gestures to create effects',
+  },
+  { id: 'talk', label: 'Talk to Me', icon: '💬', description: 'Describe effects in plain English' },
+  { id: 'learn', label: 'Show Me', icon: '📷', description: 'Learn from example images' },
+];
 
 export default function App() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [selectedShader, setSelectedShader] = useState<keyof typeof shaderExamples>('gradient');
-  const [webgpuSupported, setWebgpuSupported] = useState(true);
-  const [error, setError] = useState<string>('');
-  const cleanupRef = useRef<(() => void) | null>(null);
-
-  const initShader = useCallback(async (shaderName: keyof typeof shaderExamples) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    if (cleanupRef.current) {
-      cleanupRef.current();
-      cleanupRef.current = null;
-    }
-
-    try {
-      const ctx = await initWebGPU(canvas);
-      const { device, context, format } = ctx;
-
-      const shaderCode = shaderExamples[shaderName];
-      const shaderModule = device.createShaderModule({ code: shaderCode });
-
-      const pipeline = device.createRenderPipeline({
-        layout: 'auto',
-        vertex: { module: shaderModule, entryPoint: 'vs_main' },
-        fragment: {
-          module: shaderModule,
-          entryPoint: 'fs_main',
-          targets: [{ format }],
-        },
-      });
-
-      const render = (_frame: FrameData) => {
-        const commandEncoder = device.createCommandEncoder();
-        const textureView = context.getCurrentTexture().createView();
-
-        const renderPass = commandEncoder.beginRenderPass({
-          colorAttachments: [
-            {
-              view: textureView,
-              loadOp: 'clear',
-              clearValue: { r: 0.1, g: 0.1, b: 0.15, a: 1.0 },
-              storeOp: 'store',
-            },
-          ],
-        });
-
-        renderPass.setPipeline(pipeline);
-        renderPass.draw(3);
-        renderPass.end();
-        device.queue.submit([commandEncoder.finish()]);
-      };
-
-      const loop = createRenderLoop(render);
-      loop.start();
-
-      cleanupRef.current = () => {
-        loop.stop();
-        device.destroy();
-      };
-    } catch (err) {
-      setError(`Error: ${err instanceof Error ? err.message : String(err)}`);
-      setWebgpuSupported(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!navigator.gpu) {
-      setWebgpuSupported(false);
-      setError('WebGPU is not supported in your browser');
-      return;
-    }
-
-    initShader(selectedShader);
-
-    return () => {
-      if (cleanupRef.current) {
-        cleanupRef.current();
-      }
-    };
-  }, [selectedShader, initShader]);
-
-  if (!webgpuSupported) {
-    return (
-      <div style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
-        <h1>Shader3D Example</h1>
-        <div
-          style={{
-            padding: '1rem',
-            background: '#ff6b6b',
-            color: 'white',
-            borderRadius: '8px',
-            marginTop: '1rem',
-          }}
-        >
-          <strong>WebGPU Not Supported</strong>
-          <p>Your browser doesn't support WebGPU. Try Chrome 113+, Edge 113+, or Safari 18+.</p>
-        </div>
-      </div>
-    );
-  }
+  const [activeTab, setActiveTab] = useState<TabId>('playground');
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '1000px', margin: '0 auto' }}>
-      <h1>Shader3D Examples</h1>
-      <p>Interactive WebGPU shader demonstrations built with Shader3D</p>
-
-      <div style={{ marginTop: '1.5rem', marginBottom: '1rem' }}>
-        <label style={{ marginRight: '1rem', fontWeight: 'bold' }}>Select Shader:</label>
-        {(Object.keys(shaderExamples) as Array<keyof typeof shaderExamples>).map((name) => (
-          <button
-            key={name}
-            onClick={() => setSelectedShader(name)}
-            style={{
-              padding: '0.5rem 1rem',
-              marginRight: '0.5rem',
-              background: selectedShader === name ? '#4a9eff' : '#333',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              textTransform: 'capitalize',
-            }}
-          >
-            {name}
-          </button>
-        ))}
-      </div>
-
-      {error && (
-        <div
-          style={{
-            padding: '1rem',
-            background: '#ff6b6b',
-            color: 'white',
-            borderRadius: '8px',
-            marginBottom: '1rem',
-          }}
-        >
-          {error}
-        </div>
-      )}
-
-      <canvas
-        ref={canvasRef}
-        width={800}
-        height={600}
+    <div style={{ minHeight: '100vh', background: '#0a0a0f', color: '#fff' }}>
+      <header
         style={{
-          border: '1px solid #444',
-          borderRadius: '8px',
-          display: 'block',
-          maxWidth: '100%',
-        }}
-      />
-
-      <div
-        style={{
-          marginTop: '1.5rem',
-          padding: '1rem',
-          background: '#222',
-          borderRadius: '8px',
-          fontFamily: 'monospace',
-          fontSize: '0.9rem',
-          overflow: 'auto',
+          padding: '1rem 2rem',
+          borderBottom: '1px solid #222',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '1rem',
         }}
       >
-        <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{shaderExamples[selectedShader]}</pre>
-      </div>
+        <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600 }}>
+          <span style={{ color: '#4a9eff' }}>Shader</span>3D
+        </h1>
+        <span style={{ color: '#666', fontSize: '0.9rem' }}>
+          The Progressive Graphics Programming Library
+        </span>
+      </header>
 
-      <div style={{ marginTop: '2rem', color: '#888', fontSize: '0.9rem' }}>
+      <nav
+        style={{
+          display: 'flex',
+          gap: '0.5rem',
+          padding: '1rem 2rem',
+          borderBottom: '1px solid #222',
+          overflowX: 'auto',
+        }}
+      >
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            style={{
+              padding: '0.75rem 1.25rem',
+              background: activeTab === tab.id ? '#1a1a2e' : 'transparent',
+              color: activeTab === tab.id ? '#4a9eff' : '#888',
+              border: activeTab === tab.id ? '1px solid #333' : '1px solid transparent',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              whiteSpace: 'nowrap',
+              transition: 'all 0.2s',
+            }}
+          >
+            <span style={{ fontSize: '1.2rem' }}>{tab.icon}</span>
+            <span>{tab.label}</span>
+          </button>
+        ))}
+      </nav>
+
+      <main style={{ padding: '2rem' }}>
+        <div style={{ marginBottom: '1.5rem' }}>
+          <h2 style={{ margin: '0 0 0.5rem 0', fontSize: '1.25rem' }}>
+            {tabs.find((t) => t.id === activeTab)?.icon}{' '}
+            {tabs.find((t) => t.id === activeTab)?.label}
+          </h2>
+          <p style={{ margin: 0, color: '#888' }}>
+            {tabs.find((t) => t.id === activeTab)?.description}
+          </p>
+        </div>
+
+        {activeTab === 'playground' && <ShaderPlayground />}
+        {activeTab === 'layers' && <LayerEditor />}
+        {activeTab === 'presets' && <PresetGallery />}
+        {activeTab === 'paint' && <PaintEffects />}
+        {activeTab === 'talk' && <NaturalLanguage />}
+        {activeTab === 'learn' && <LearnFromExamples />}
+      </main>
+
+      <footer
+        style={{
+          padding: '2rem',
+          borderTop: '1px solid #222',
+          textAlign: 'center',
+          color: '#666',
+          fontSize: '0.9rem',
+        }}
+      >
         <p>
           <strong>Shader3D</strong> - Write GPU shaders in TypeScript, compile to WGSL for WebGPU
         </p>
         <p>
           <a href="https://github.com/sridhar-mani/newLang" style={{ color: '#4a9eff' }}>
-            View on GitHub
+            GitHub
           </a>
-          {' | '}
+          {' • '}
           <a href="https://www.npmjs.com/org/shader3d" style={{ color: '#4a9eff' }}>
-            npm Packages
+            npm
           </a>
         </p>
-      </div>
+      </footer>
     </div>
   );
 }

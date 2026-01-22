@@ -1,0 +1,25 @@
+{
+    "name": "@shader3d/presets",
+    "version": "0.1.0",
+    "description": "Professional shader effect presets with smart adaptation",
+    "type": "module",
+    "main": "./dist/index.js",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "import": "./dist/index.js",
+            "types": "./dist/index.d.ts"
+        }
+    },
+    "scripts": {
+        "build": "tsc",
+        "dev": "tsc --watch"
+    },
+    "dependencies": {
+        "@shader3d/core": "workspace:*",
+        "@shader3d/layers": "workspace:*"
+    },
+    "keywords": ["shader", "presets", "effects", "filters", "webgpu"],
+    "license": "MIT"
+}

@@ -1,0 +1,32 @@
+{
+    "name": "@shader3d/learn-from-examples",
+    "version": "0.1.0",
+    "description": "Learn shader effects from example images for Shader3D",
+    "type": "module",
+    "main": "./dist/index.js",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "import": "./dist/index.js",
+            "types": "./dist/index.d.ts"
+        }
+    },
+    "scripts": {
+        "build": "tsc",
+        "dev": "tsc --watch",
+        "test": "vitest"
+    },
+    "dependencies": {
+        "@shader3d/core": "workspace:*",
+        "@shader3d/layers": "workspace:*",
+        "@shader3d/presets": "workspace:*"
+    },
+    "devDependencies": {
+        "typescript": "^5.0.0"
+    },
+    "peerDependencies": {},
+    "keywords": ["shader", "learn", "example", "image", "ai", "style"],
+    "author": "",
+    "license": "MIT"
+}

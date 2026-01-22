@@ -12,6 +12,11 @@
   "dependencies": {
     "@shader3d/core": "*",
     "@shader3d/runtime": "*",
+    "@shader3d/layers": "*",
+    "@shader3d/presets": "*",
+    "@shader3d/paint-effects": "*",
+    "@shader3d/natural-language": "*",
+    "@shader3d/learn-from-examples": "*",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
