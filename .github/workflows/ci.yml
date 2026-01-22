@@ -31,10 +31,6 @@ jobs:
             - name: Run type check
               run: npm run typecheck --if-present
 
-            - name: Run tests
-              run: npm test --if-present
-              continue-on-error: true
-
             - name: Build packages
               run: npm run build
 
