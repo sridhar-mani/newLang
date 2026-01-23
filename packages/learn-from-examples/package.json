@@ -18,9 +18,9 @@
         "test": "vitest"
     },
     "dependencies": {
-        "@shader3d/core": "workspace:*",
-        "@shader3d/layers": "workspace:*",
-        "@shader3d/presets": "workspace:*"
+        "@shader3d/core": "*",
+        "@shader3d/layers": "*",
+        "@shader3d/presets": "*"
     },
     "devDependencies": {
         "typescript": "^5.0.0"
