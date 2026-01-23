@@ -160,12 +160,12 @@ export function ShaderPlayground() {
   const compileShader = useCallback(
     (source: string): string | null => {
       try {
-        const ast = parse(source);
-        const analyzed = analyze(ast);
-        const transformed = transform(analyzed);
-        const wgsl = codegen(transformed);
+        const parseResult = parse(source);
+        const transformResult = transform(parseResult.ast);
+        const analysisResult = analyze(transformResult.ir);
+        const codegenResult = codegen(analysisResult.ir);
         setCompileError('');
-        return wgsl;
+        return codegenResult.code;
       } catch (err) {
         // Fallback to pre-compiled WGSL for demo purposes
         const precompiled = wgslShaders[selectedShader];

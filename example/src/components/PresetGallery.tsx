@@ -1,18 +1,15 @@
 import { useState, useCallback, useEffect } from 'react';
-import {
-  PresetManager,
-  getBuiltInPresets,
-  type Preset,
-  type PresetCategory,
-} from '@shader3d/presets';
+import { PresetManager, ALL_PRESETS, type Preset, type PresetCategory } from '@shader3d/presets';
 
 const categoryInfo: Record<PresetCategory, { icon: string; description: string }> = {
-  cinematic: { icon: '🎬', description: 'Film-inspired color grades and effects' },
-  retro: { icon: '📼', description: 'Vintage and nostalgic visual styles' },
-  nature: { icon: '🌿', description: 'Natural lighting and atmospheric effects' },
-  abstract: { icon: '🎨', description: 'Creative and artistic transformations' },
-  utility: { icon: '🔧', description: 'Common adjustments and fixes' },
-  custom: { icon: '⚡', description: 'User-created presets' },
+  photography: { icon: '📷', description: 'Professional photography looks' },
+  video: { icon: '🎬', description: 'Film and video color grading' },
+  gaming: { icon: '🎮', description: 'Game-inspired visual effects' },
+  motion: { icon: '💨', description: 'Motion and transition effects' },
+  artistic: { icon: '🎨', description: 'Artistic and stylized looks' },
+  color: { icon: '🌈', description: 'Color adjustments and corrections' },
+  vintage: { icon: '📼', description: 'Retro and vintage aesthetics' },
+  modern: { icon: '✨', description: 'Contemporary and clean styles' },
 };
 
 export function PresetGallery() {
@@ -32,38 +29,56 @@ export function PresetGallery() {
   });
 
   useEffect(() => {
-    const builtIn = getBuiltInPresets();
-    setPresets(builtIn);
+    setPresets(ALL_PRESETS);
   }, []);
 
   const filteredPresets =
     selectedCategory === 'all' ? presets : presets.filter((p) => p.category === selectedCategory);
 
   const handlePresetSelect = useCallback(
-    (preset: Preset) => {
+    async (preset: Preset) => {
       setSelectedPreset(preset);
 
-      // Apply smart adaptation based on context
-      const adapted = presetManager.adaptPreset(preset, context);
-      setAdaptedSettings(adapted.parameters);
+      // Apply preset (gets adapted layers)
+      const layers = await presetManager.applyPreset(preset.id, undefined, { adapt: true });
 
-      // Generate the shader code
-      const code = presetManager.compilePreset(adapted);
+      // Store adapted layers params
+      const params: Record<string, number> = {};
+      layers.forEach((layer, i) => {
+        Object.entries(layer.params).forEach(([key, val]) => {
+          if (typeof val === 'number') {
+            params[`layer${i}_${key}`] = val;
+          }
+        });
+      });
+      setAdaptedSettings(params);
+
+      // Generate the shader code (placeholder)
+      const code = `// Preset: ${preset.name}\n${layers.map((l) => `// - ${l.effect} (${l.type})`).join('\n')}`;
       setGeneratedCode(code);
     },
     [context, presetManager]
   );
 
   const handleContextChange = useCallback(
-    (key: keyof typeof context, value: number) => {
+    async (key: keyof typeof context, value: number) => {
       setContext((prev) => ({ ...prev, [key]: value }));
 
       // Re-adapt current preset if one is selected
       if (selectedPreset) {
-        const newContext = { ...context, [key]: value };
-        const adapted = presetManager.adaptPreset(selectedPreset, newContext);
-        setAdaptedSettings(adapted.parameters);
-        const code = presetManager.compilePreset(adapted);
+        const layers = await presetManager.applyPreset(selectedPreset.id, undefined, {
+          adapt: true,
+        });
+        const params: Record<string, number> = {};
+        layers.forEach((layer, i) => {
+          Object.entries(layer.params).forEach(([key, val]) => {
+            if (typeof val === 'number') {
+              params[`layer${i}_${key}`] = val;
+            }
+          });
+        });
+        setAdaptedSettings(params);
+        const code = `// Preset: ${selectedPreset.name}\n${layers.map((l) => `// - ${l.effect} (${l.type})`).join('\n')}`;
         setGeneratedCode(code);
       }
     },
@@ -147,16 +162,18 @@ export function PresetGallery() {
                   height: '100px',
                   borderRadius: '8px',
                   marginBottom: '0.75rem',
-                  background: `linear-gradient(135deg, 
-                  ${preset.preview?.primaryColor || '#4a9eff'}40, 
-                  ${preset.preview?.secondaryColor || '#ff6b6b'}40)`,
+                  background: preset.thumbnail
+                    ? `url(${preset.thumbnail})`
+                    : `linear-gradient(135deg, #4a9eff40, #ff6b6b40)`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: '2rem',
                 }}
               >
-                {categoryInfo[preset.category].icon}
+                {!preset.thumbnail && categoryInfo[preset.category].icon}
               </div>
 
               <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '0.9rem' }}>{preset.name}</h4>

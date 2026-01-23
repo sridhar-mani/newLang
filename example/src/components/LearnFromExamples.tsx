@@ -1,9 +1,9 @@
 import { useState, useCallback, useRef } from 'react';
 import {
   ImageAnalyzer,
-  StyleSynthesizer,
-  type AnalysisResult,
-  type SynthesizedStyle,
+  ShaderSynthesizer,
+  type StyleAnalysis,
+  type SynthesizedLayers,
 } from '@shader3d/learn-from-examples';
 
 const sampleImages = [
@@ -41,11 +41,11 @@ const sampleImages = [
 
 export function LearnFromExamples() {
   const [analyzer] = useState(() => new ImageAnalyzer());
-  const [synthesizer] = useState(() => new StyleSynthesizer());
+  const [synthesizer] = useState(() => new ShaderSynthesizer());
 
   const [imageUrl, setImageUrl] = useState<string>('');
-  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
-  const [synthesizedStyle, setSynthesizedStyle] = useState<SynthesizedStyle | null>(null);
+  const [analysis, setAnalysis] = useState<StyleAnalysis | null>(null);
+  const [synthesizedStyle, setSynthesizedStyle] = useState<SynthesizedLayers | null>(null);
   const [generatedCode, setGeneratedCode] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState('');
@@ -58,16 +58,31 @@ export function LearnFromExamples() {
       setImageUrl(url);
 
       try {
+        // Load image as ImageData
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+          img.src = url;
+        });
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
         // Analyze the image
-        const result = await analyzer.analyze(url);
+        const result = await analyzer.analyze(imageData);
         setAnalysis(result);
 
         // Synthesize a style from the analysis
         const style = synthesizer.synthesize(result);
         setSynthesizedStyle(style);
 
-        // Generate shader code
-        const code = synthesizer.compile(style);
+        // Generate shader code - synthesizer doesn't have compile method, use placeholder
+        const code = `// Synthesized ${style.layers.length} layers with ${(style.matchScore * 100).toFixed(0)}% match\n// Layers: ${style.layers.map((l) => l.effect).join(', ')}`;
         setGeneratedCode(code);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to analyze image');
@@ -285,19 +300,30 @@ export function LearnFromExamples() {
                 🎨 Extracted Colors
               </h3>
               <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
-                {analysis.dominantColors.map((color: string, i: number) => (
-                  <div
-                    key={i}
-                    style={{
-                      width: '40px',
-                      height: '40px',
-                      borderRadius: '8px',
-                      background: color,
-                      border: '2px solid #333',
-                    }}
-                    title={color}
-                  />
-                ))}
+                {analysis.colorProfile.dominantColors.map(
+                  (color: [number, number, number], i: number) => {
+                    const hex = `#${Math.round(color[0] * 255)
+                      .toString(16)
+                      .padStart(2, '0')}${Math.round(color[1] * 255)
+                      .toString(16)
+                      .padStart(2, '0')}${Math.round(color[2] * 255)
+                      .toString(16)
+                      .padStart(2, '0')}`;
+                    return (
+                      <div
+                        key={i}
+                        style={{
+                          width: '40px',
+                          height: '40px',
+                          borderRadius: '8px',
+                          background: hex,
+                          border: '2px solid #333',
+                        }}
+                        title={hex}
+                      />
+                    );
+                  }
+                )}
               </div>
 
               <div
@@ -321,7 +347,7 @@ export function LearnFromExamples() {
                   >
                     <div
                       style={{
-                        width: `${analysis.brightness * 100}%`,
+                        width: `${analysis.toneProfile.brightness * 100}%`,
                         height: '100%',
                         background: '#fbbf24',
                       }}
@@ -341,7 +367,7 @@ export function LearnFromExamples() {
                   >
                     <div
                       style={{
-                        width: `${analysis.saturation * 100}%`,
+                        width: `${analysis.colorProfile.saturationLevel * 100}%`,
                         height: '100%',
                         background: '#f472b6',
                       }}
@@ -361,7 +387,7 @@ export function LearnFromExamples() {
                   >
                     <div
                       style={{
-                        width: `${analysis.contrast * 100}%`,
+                        width: `${analysis.toneProfile.contrast * 100}%`,
                         height: '100%',
                         background: '#a78bfa',
                       }}
@@ -382,7 +408,7 @@ export function LearnFromExamples() {
                     <div
                       style={{
                         position: 'absolute',
-                        left: `${analysis.colorTemperature * 100}%`,
+                        left: `${((analysis.colorProfile.colorTemperature + 1) / 2) * 100}%`,
                         top: '-2px',
                         width: '10px',
                         height: '10px',
@@ -420,12 +446,14 @@ export function LearnFromExamples() {
                     fontWeight: 500,
                   }}
                 >
-                  {analysis.mood}
+                  {analysis.styleMarkers.length > 0
+                    ? analysis.styleMarkers[0].type
+                    : 'auto-detected'}
                 </span>
               </div>
 
               <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
-                {analysis.tags.map((tag: string, i: number) => (
+                {analysis.styleMarkers.slice(0, 6).map((marker, i: number) => (
                   <span
                     key={i}
                     style={{
@@ -436,7 +464,7 @@ export function LearnFromExamples() {
                       color: '#888',
                     }}
                   >
-                    {tag}
+                    {marker.type}
                   </span>
                 ))}
               </div>
@@ -456,46 +484,37 @@ export function LearnFromExamples() {
                   🔮 Synthesized Effects
                 </h3>
 
-                {synthesizedStyle.effects.map(
-                  (
-                    effect: {
-                      type: string;
-                      intensity: number;
-                      parameters: Record<string, unknown>;
-                    },
-                    i: number
-                  ) => (
+                {synthesizedStyle.layers.map((layer, i: number) => (
+                  <div
+                    key={i}
+                    style={{
+                      background: '#222238',
+                      borderRadius: '8px',
+                      padding: '0.75rem',
+                      marginBottom: '0.5rem',
+                    }}
+                  >
                     <div
-                      key={i}
                       style={{
-                        background: '#222238',
-                        borderRadius: '8px',
-                        padding: '0.75rem',
+                        display: 'flex',
+                        justifyContent: 'space-between',
                         marginBottom: '0.5rem',
                       }}
                     >
-                      <div
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          marginBottom: '0.5rem',
-                        }}
-                      >
-                        <span style={{ fontWeight: 500, fontSize: '0.85rem' }}>{effect.type}</span>
-                        <span style={{ color: '#4a9eff', fontSize: '0.75rem' }}>
-                          {Math.round(effect.intensity * 100)}%
-                        </span>
-                      </div>
-                      <div style={{ fontSize: '0.7rem', color: '#666' }}>
-                        {Object.entries(effect.parameters).map(([key, val]) => (
-                          <span key={key} style={{ marginRight: '0.75rem' }}>
-                            {key}: {typeof val === 'number' ? val.toFixed(2) : String(val)}
-                          </span>
-                        ))}
-                      </div>
+                      <span style={{ fontWeight: 500, fontSize: '0.85rem' }}>{layer.effect}</span>
+                      <span style={{ color: '#4a9eff', fontSize: '0.75rem' }}>
+                        {Math.round(layer.opacity * 100)}%
+                      </span>
                     </div>
-                  )
-                )}
+                    <div style={{ fontSize: '0.7rem', color: '#666' }}>
+                      {Object.entries(layer.params).map(([key, val]) => (
+                        <span key={key} style={{ marginRight: '0.75rem' }}>
+                          {key}: {typeof val === 'number' ? val.toFixed(2) : String(val)}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </>

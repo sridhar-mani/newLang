@@ -2,8 +2,9 @@ import { useState, useCallback } from 'react';
 import {
   SessionManager,
   parseNaturalLanguage,
-  type ParsedEffect,
-  type EffectSlider,
+  LayerGenerator,
+  type ParsedIntent,
+  type Slider,
 } from '@shader3d/natural-language';
 
 const examplePrompts = [
@@ -19,9 +20,10 @@ const examplePrompts = [
 
 export function NaturalLanguage() {
   const [sessionManager] = useState(() => new SessionManager());
+  const [generator] = useState(() => new LayerGenerator());
   const [input, setInput] = useState('');
-  const [parsedEffect, setParsedEffect] = useState<ParsedEffect | null>(null);
-  const [sliders, setSliders] = useState<EffectSlider[]>([]);
+  const [parsedEffect, setParsedEffect] = useState<ParsedIntent | null>(null);
+  const [sliders, setSliders] = useState<Slider[]>([]);
   const [sliderValues, setSliderValues] = useState<Record<string, number>>({});
   const [generatedCode, setGeneratedCode] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -29,7 +31,7 @@ export function NaturalLanguage() {
     Array<{
       role: 'user' | 'assistant';
       content: string;
-      effect?: ParsedEffect;
+      effect?: ParsedIntent;
     }>
   >([]);
 
@@ -47,24 +49,25 @@ export function NaturalLanguage() {
         const parsed = parseNaturalLanguage(text);
         setParsedEffect(parsed);
 
-        // Generate sliders for fine-tuning
-        const effectSliders = sessionManager.generateSliders(parsed);
+        // Generate layers and sliders
+        const layers = generator.generate(parsed);
+        const effectSliders = generator.generateSliders(layers);
         setSliders(effectSliders);
 
         // Initialize slider values
         const initialValues: Record<string, number> = {};
-        effectSliders.forEach((slider: EffectSlider) => {
-          initialValues[slider.id] = slider.defaultValue;
+        effectSliders.forEach((slider: Slider) => {
+          initialValues[slider.id] = slider.value;
         });
         setSliderValues(initialValues);
 
-        // Generate initial shader code
-        const code = sessionManager.compileEffect(parsed, initialValues);
+        // Generate initial shader code (placeholder)
+        const code = `// Generated ${layers.length} layers\n${layers.map((l) => `// - ${l.effect} (${l.type})`).join('\n')}`;
         setGeneratedCode(code);
 
         // Add assistant response
         const response =
-          `I'll create a ${parsed.effects.map((e: { type: string }) => e.type).join(', ')} effect for you. ` +
+          `I'll create effects with ${parsed.effects.map((e) => e.effectWord.effectName).join(', ')}. ` +
           `Use the sliders below to fine-tune the result.`;
         setConversation((prev) => [
           ...prev,
@@ -92,11 +95,12 @@ export function NaturalLanguage() {
       setSliderValues(newValues);
 
       if (parsedEffect) {
-        const code = sessionManager.compileEffect(parsedEffect, newValues);
+        const layers = generator.generate(parsedEffect);
+        const code = `// Updated layers with slider values\n${layers.map((l) => `// - ${l.effect} (${l.type})`).join('\n')}`;
         setGeneratedCode(code);
       }
     },
-    [sliderValues, parsedEffect, sessionManager]
+    [sliderValues, parsedEffect, generator]
   );
 
   const handleExampleClick = useCallback(
@@ -125,8 +129,7 @@ export function NaturalLanguage() {
     setSliders([]);
     setSliderValues({});
     setGeneratedCode('');
-    sessionManager.reset();
-  }, [sessionManager]);
+  }, []);
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '1.5rem' }}>
@@ -202,7 +205,7 @@ export function NaturalLanguage() {
                             marginTop: '0.25rem',
                           }}
                         >
-                          {msg.effect.effects.map((e: { type: string }, i: number) => (
+                          {msg.effect.effects.map((e, i: number) => (
                             <span
                               key={i}
                               style={{
@@ -211,7 +214,7 @@ export function NaturalLanguage() {
                                 borderRadius: '4px',
                               }}
                             >
-                              {e.type}
+                              {e.effectWord.effectName}
                             </span>
                           ))}
                         </div>
@@ -338,7 +341,7 @@ export function NaturalLanguage() {
                 >
                   <span>{slider.label}</span>
                   <span style={{ color: '#4a9eff' }}>
-                    {sliderValues[slider.id]?.toFixed(2) ?? slider.defaultValue.toFixed(2)}
+                    {sliderValues[slider.id]?.toFixed(2) ?? slider.value.toFixed(2)}
                   </span>
                 </label>
                 <input
@@ -346,11 +349,11 @@ export function NaturalLanguage() {
                   min={slider.min}
                   max={slider.max}
                   step={slider.step}
-                  value={sliderValues[slider.id] ?? slider.defaultValue}
+                  value={sliderValues[slider.id] ?? slider.value}
                   onChange={(e) => handleSliderChange(slider.id, parseFloat(e.target.value))}
                   style={{ width: '100%' }}
                 />
-                <div style={{ fontSize: '0.7rem', color: '#666' }}>{slider.description}</div>
+                <div style={{ fontSize: '0.7rem', color: '#666' }}>{slider.unit || ''}</div>
               </div>
             ))}
           </div>
@@ -379,7 +382,7 @@ export function NaturalLanguage() {
                   marginBottom: '0.25rem',
                 }}
               >
-                Mood
+                Confidence
               </span>
               <span
                 style={{
@@ -389,7 +392,7 @@ export function NaturalLanguage() {
                   fontSize: '0.8rem',
                 }}
               >
-                {parsedEffect.mood}
+                {Math.round(parsedEffect.confidence * 100)}%
               </span>
             </div>
 
@@ -402,22 +405,33 @@ export function NaturalLanguage() {
                   marginBottom: '0.25rem',
                 }}
               >
-                Colors
+                Detected Colors
               </span>
               <div style={{ display: 'flex', gap: '0.25rem' }}>
-                {parsedEffect.colors.map((color: string, i: number) => (
-                  <div
-                    key={i}
-                    style={{
-                      width: '24px',
-                      height: '24px',
-                      borderRadius: '4px',
-                      background: color,
-                      border: '1px solid #444',
-                    }}
-                    title={color}
-                  />
-                ))}
+                {parsedEffect.effects
+                  .flatMap((e) => e.colors)
+                  .map((color, i: number) => {
+                    const hex = `#${Math.round(color.rgb[0] * 255)
+                      .toString(16)
+                      .padStart(2, '0')}${Math.round(color.rgb[1] * 255)
+                      .toString(16)
+                      .padStart(2, '0')}${Math.round(color.rgb[2] * 255)
+                      .toString(16)
+                      .padStart(2, '0')}`;
+                    return (
+                      <div
+                        key={i}
+                        style={{
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '4px',
+                          background: hex,
+                          border: '1px solid #444',
+                        }}
+                        title={color.word}
+                      />
+                    );
+                  })}
               </div>
             </div>
 
@@ -430,23 +444,17 @@ export function NaturalLanguage() {
                   marginBottom: '0.25rem',
                 }}
               >
-                Intensity
+                Effects Count
               </span>
               <div
                 style={{
-                  height: '8px',
+                  padding: '0.25rem 0.5rem',
                   background: '#333',
                   borderRadius: '4px',
-                  overflow: 'hidden',
+                  fontSize: '0.8rem',
                 }}
               >
-                <div
-                  style={{
-                    width: `${parsedEffect.intensity * 100}%`,
-                    height: '100%',
-                    background: 'linear-gradient(90deg, #4a9eff, #ff6b6b)',
-                  }}
-                />
+                {parsedEffect.effects.length} effect(s)
               </div>
             </div>
           </div>

@@ -43,47 +43,37 @@ export function PaintEffects() {
   useEffect(() => {
     if (canvasRef.current) {
       const canvas = new PaintCanvas(canvasRef.current, {
-        brushSize,
-        brushColor,
+        gestureThreshold: 0.7,
+        minStrokeLength: brushSize * 4,
       });
       setPaintCanvas(canvas);
 
       return () => {
-        canvas.destroy();
+        canvas.dispose();
       };
     }
   }, []);
 
   useEffect(() => {
     if (paintCanvas) {
-      paintCanvas.setBrushSize(brushSize);
-      paintCanvas.setBrushColor(brushColor);
+      paintCanvas.setLineWidth(brushSize);
+      paintCanvas.setColor(brushColor);
     }
   }, [paintCanvas, brushSize, brushColor]);
 
   const handlePointerDown = useCallback(
-    (e: React.PointerEvent) => {
+    (_e: React.PointerEvent) => {
       if (!paintCanvas) return;
       setIsDrawing(true);
       setDetectedGesture(null);
       setGeneratedEffect(null);
-
-      const rect = canvasRef.current!.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      paintCanvas.startStroke(x, y);
     },
     [paintCanvas]
   );
 
   const handlePointerMove = useCallback(
-    (e: React.PointerEvent) => {
+    (_e: React.PointerEvent) => {
       if (!paintCanvas || !isDrawing) return;
-
-      const rect = canvasRef.current!.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      paintCanvas.continueStroke(x, y);
     },
     [paintCanvas, isDrawing]
   );
@@ -92,24 +82,22 @@ export function PaintEffects() {
     if (!paintCanvas || !isDrawing) return;
     setIsDrawing(false);
 
-    const stroke = paintCanvas.endStroke();
-    if (!stroke || stroke.points.length < 5) return;
+    // Get latest effect from canvas
+    const effects = paintCanvas.getEffects();
+    if (effects.length > 0) {
+      const latestEffect = effects[effects.length - 1];
+      setGeneratedEffect(latestEffect);
 
-    // Recognize the gesture
-    const gesture = recognizer.recognize(stroke);
-    setDetectedGesture(gesture);
-
-    if (gesture.confidence > 0.5) {
-      // Generate effect from gesture
-      const effect = generator.generateEffect(gesture);
-      setGeneratedEffect(effect);
-
-      // Generate WGSL code
-      const code = generator.compileEffect(effect);
+      // Generate WGSL code (placeholder)
+      const code = `// Generated effect: ${latestEffect.effect}\n// Type: ${latestEffect.layerType}\n// Opacity: ${(latestEffect.opacity * 100).toFixed(0)}%`;
       setGeneratedCode(code);
 
-      // Add to history
-      setHistory((prev) => [...prev.slice(-9), { gesture, effect }]);
+      const session = paintCanvas.getSession();
+      const gesture = session.recognizedGestures[session.recognizedGestures.length - 1];
+      if (gesture) {
+        setDetectedGesture(gesture);
+        setHistory((prev) => [...prev.slice(-9), { gesture, effect: latestEffect }]);
+      }
     }
   }, [paintCanvas, isDrawing, recognizer, generator]);
 
@@ -333,8 +321,8 @@ export function PaintEffects() {
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#888' }}>Stroke Length</span>
-                  <span>{Math.round(detectedGesture.strokeLength)}px</span>
+                  <span style={{ color: '#888' }}>Scale</span>
+                  <span>{Math.round(detectedGesture.scale ?? 100)}</span>
                 </div>
               </div>
             </div>
@@ -360,10 +348,10 @@ export function PaintEffects() {
               Generated Effect
             </h3>
             <div style={{ fontSize: '0.9rem', fontWeight: 500, marginBottom: '0.5rem' }}>
-              {generatedEffect.name}
+              {generatedEffect.effect}
             </div>
             <p style={{ fontSize: '0.75rem', color: '#888', marginBottom: '1rem' }}>
-              {generatedEffect.description}
+              Type: {generatedEffect.layerType}
             </p>
 
             <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.75rem', color: '#888' }}>
@@ -377,7 +365,7 @@ export function PaintEffects() {
                 fontSize: '0.75rem',
               }}
             >
-              {Object.entries(generatedEffect.parameters).map(([key, value]) => (
+              {Object.entries(generatedEffect.params).map(([key, value]) => (
                 <div
                   key={key}
                   style={{
@@ -473,7 +461,7 @@ export function PaintEffects() {
                   }}
                 >
                   <span>{gestureGuide.find((g) => g.type === item.gesture.type)?.icon}</span>
-                  <span>{item.effect.name}</span>
+                  <span>{item.effect.effect}</span>
                 </div>
               ))}
             </div>
