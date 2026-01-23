@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { initWebGPU, createRenderLoop, type FrameData } from '@shader3d/runtime';
+import { initWebGPU, createRenderLoop, isWebGPUSupported, type FrameData } from '@shader3d/runtime';
 import { parse, analyze, transform, codegen } from '@shader3d/core';
 
 const tsShaderExamples = {
@@ -154,7 +154,18 @@ export function ShaderPlayground() {
   const [compiledWGSL, setCompiledWGSL] = useState('');
   const [compileError, setCompileError] = useState('');
   const [isCustom, setIsCustom] = useState(false);
+  const [webgpuSupported, setWebgpuSupported] = useState(true);
   const cleanupRef = useRef<(() => void) | null>(null);
+
+  // Check WebGPU support on mount
+  useEffect(() => {
+    if (!isWebGPUSupported()) {
+      setWebgpuSupported(false);
+      setCompileError(
+        'WebGPU is not supported in your browser. Please use Chrome, Edge, or another WebGPU-enabled browser.'
+      );
+    }
+  }, []);
 
   // Compile TypeScript-like shader to WGSL using @shader3d/core
   const compileShader = useCallback(
@@ -182,11 +193,17 @@ export function ShaderPlayground() {
 
   const initShader = useCallback(async (wgslCode: string) => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || !webgpuSupported) return;
 
+    // Clean up any existing WebGPU resources before initializing new ones
     if (cleanupRef.current) {
-      cleanupRef.current();
-      cleanupRef.current = null;
+      try {
+        cleanupRef.current();
+      } catch (err) {
+        console.warn('Cleanup error:', err);
+      } finally {
+        cleanupRef.current = null;
+      }
     }
 
     try {
@@ -272,8 +289,15 @@ export function ShaderPlayground() {
     }
 
     return () => {
+      // Cleanup WebGPU resources when component unmounts or dependencies change
       if (cleanupRef.current) {
-        cleanupRef.current();
+        try {
+          cleanupRef.current();
+        } catch (err) {
+          console.warn('Cleanup error on unmount:', err);
+        } finally {
+          cleanupRef.current = null;
+        }
       }
     };
   }, [customCode, compileShader, initShader]);
