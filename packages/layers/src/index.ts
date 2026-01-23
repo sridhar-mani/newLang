@@ -12,4 +12,7 @@ export { createLayer as createEffectLayer } from './layer-types';
 export type { EffectLayer as AdjustmentLayer, EffectLayer as SolidLayer } from './layer-types';
 
 // Alias functions for backward compatibility
-export { createLayer as createAdjustmentLayer, createLayer as createSolidLayer } from './layer-types';
+export {
+  createLayer as createAdjustmentLayer,
+  createLayer as createSolidLayer,
+} from './layer-types';

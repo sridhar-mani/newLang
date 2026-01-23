@@ -7,4 +7,7 @@ export * from './learn-from-examples';
 export { ShaderSynthesizer as StyleSynthesizer } from './synthesizer';
 
 // Export renamed types
-export type { StyleAnalysis as AnalysisResult, SynthesizedLayers as SynthesizedStyle } from './types';
+export type {
+  StyleAnalysis as AnalysisResult,
+  SynthesizedLayers as SynthesizedStyle,
+} from './types';

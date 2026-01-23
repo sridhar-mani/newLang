@@ -48,7 +48,7 @@ export { analyze, Analyzer, constantFold, deadCodeElimination } from './analyzer
 export type { CodeGenResult, CodeGenOptions } from './codegen';
 export {
   generate,
-  generate as codegen,  // Alias for backward compatibility
+  generate as codegen, // Alias for backward compatibility
   CodeGenerator,
   generateFullscreenVertexShader,
   generateUniformBuffer,

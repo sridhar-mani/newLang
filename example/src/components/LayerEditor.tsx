@@ -1,10 +1,5 @@
 import { useState, useCallback } from 'react';
-import {
-  LayerComposition,
-  createLayer,
-  BlendMode,
-  type EffectLayer,
-} from '@shader3d/layers';
+import { LayerComposition, createLayer, BlendMode, type EffectLayer } from '@shader3d/layers';
 
 type AnyLayer = EffectLayer;
 
