@@ -18,8 +18,8 @@
         "test": "vitest"
     },
     "dependencies": {
-        "@shader3d/core": "workspace:*",
-        "@shader3d/layers": "workspace:*"
+        "@shader3d/core": "*",
+        "@shader3d/layers": "*"
     },
     "devDependencies": {
         "typescript": "^5.0.0"
