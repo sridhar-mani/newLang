@@ -147,8 +147,11 @@ export class PresetManager {
     const preset: Preset = {
       id,
       name,
+      description: options?.description ?? '',
       layers,
       category: options?.category ?? 'artistic',
+      tags: options?.tags ?? [],
+      icon: options?.icon ?? '🎨',
       version: '1.0.0',
       ...options,
     };

@@ -1,16 +1,12 @@
 import { useState, useCallback } from 'react';
 import {
   LayerComposition,
-  createEffectLayer,
-  createAdjustmentLayer,
-  createSolidLayer,
+  createLayer,
   BlendMode,
   type EffectLayer,
-  type AdjustmentLayer,
-  type SolidLayer,
 } from '@shader3d/layers';
 
-type AnyLayer = EffectLayer | AdjustmentLayer | SolidLayer;
+type AnyLayer = EffectLayer;
 
 interface LayerState {
   layer: AnyLayer;
@@ -25,10 +21,10 @@ const blendModes: BlendMode[] = [
   'overlay',
   'darken',
   'lighten',
-  'color-dodge',
-  'color-burn',
-  'hard-light',
-  'soft-light',
+  'colorDodge',
+  'colorBurn',
+  'hardLight',
+  'softLight',
   'difference',
   'exclusion',
   'hue',
@@ -58,9 +54,8 @@ const adjustmentTypes = [
 export function LayerEditor() {
   const [layers, setLayers] = useState<LayerState[]>([
     {
-      layer: createSolidLayer({
-        name: 'Background',
-        color: { r: 0.1, g: 0.1, b: 0.15, a: 1 },
+      layer: createLayer('blur', 'gaussian', {
+        name: 'Background Blur',
       }),
       visible: true,
       expanded: false,
@@ -70,43 +65,47 @@ export function LayerEditor() {
   const [generatedCode, setGeneratedCode] = useState<string>('');
 
   const addEffectLayer = useCallback((effectType: string) => {
-    const newLayer = createEffectLayer({
+    // Map effect IDs to actual layer types
+    const typeMap: Record<string, { type: EffectLayer['type']; effect: string }> = {
+      blur: { type: 'blur', effect: 'gaussian' },
+      glow: { type: 'glow', effect: 'bloom' },
+      vignette: { type: 'stylize', effect: 'vignette' },
+      chromatic: { type: 'stylize', effect: 'chromaticAberration' },
+      grain: { type: 'noise', effect: 'grain' },
+      distortion: { type: 'distortion', effect: 'wave' },
+    };
+    const mapping = typeMap[effectType] || { type: 'blur', effect: 'gaussian' };
+    const newLayer = createLayer(mapping.type, mapping.effect, {
       name: `${effectType.charAt(0).toUpperCase() + effectType.slice(1)} Effect`,
-      effectType: effectType as EffectLayer['effectType'],
-      intensity: 0.5,
-      blendMode: 'normal',
-      opacity: 1,
     });
     setLayers((prev) => [...prev, { layer: newLayer, visible: true, expanded: true }]);
     setSelectedLayerId(newLayer.id);
   }, []);
 
   const addAdjustmentLayer = useCallback((adjustmentType: string) => {
-    const newLayer = createAdjustmentLayer({
+    // Map adjustment IDs to color layer effects
+    const effectMap: Record<string, string> = {
+      'brightness-contrast': 'brightnessContrast',
+      'hue-saturation': 'hueSaturation',
+      vibrance: 'vibrance',
+      tint: 'tint',
+      invert: 'invert',
+    };
+    const effect = effectMap[adjustmentType] || 'brightnessContrast';
+    const newLayer = createLayer('color', effect, {
       name: `${adjustmentType
         .split('-')
         .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
         .join(' ')}`,
-      adjustmentType: adjustmentType as AdjustmentLayer['adjustmentType'],
-      settings: {},
-      blendMode: 'normal',
-      opacity: 1,
     });
     setLayers((prev) => [...prev, { layer: newLayer, visible: true, expanded: true }]);
     setSelectedLayerId(newLayer.id);
   }, []);
 
   const addSolidLayer = useCallback(() => {
-    const colors = [
-      { r: 1, g: 0.4, b: 0.4, a: 0.5 },
-      { r: 0.4, g: 1, b: 0.4, a: 0.5 },
-      { r: 0.4, g: 0.4, b: 1, a: 0.5 },
-      { r: 1, g: 0.8, b: 0.2, a: 0.5 },
-    ];
-    const color = colors[Math.floor(Math.random() * colors.length)];
-    const newLayer = createSolidLayer({
+    // Use a color layer with tint as a "solid" layer
+    const newLayer = createLayer('color', 'tint', {
       name: 'Color Fill',
-      color,
       blendMode: 'overlay',
       opacity: 0.7,
     });
@@ -151,14 +150,14 @@ export function LayerEditor() {
   }, []);
 
   const generateShaderCode = useCallback(() => {
-    const composition = new LayerComposition();
+    const composition = new LayerComposition(800, 600);
     layers
       .filter((ls) => ls.visible)
       .forEach((ls) => {
         composition.addLayer(ls.layer);
       });
-    const code = composition.compile();
-    setGeneratedCode(code);
+    const result = composition.compile();
+    setGeneratedCode(result.wgsl);
   }, [layers]);
 
   return (
@@ -294,11 +293,9 @@ export function LayerEditor() {
                   inset: `${10 + index * 5}px`,
                   borderRadius: '8px',
                   background:
-                    ls.layer.type === 'solid'
-                      ? `rgba(${(ls.layer as SolidLayer).color.r * 255}, ${(ls.layer as SolidLayer).color.g * 255}, ${(ls.layer as SolidLayer).color.b * 255}, ${(ls.layer as SolidLayer).color.a})`
-                      : ls.layer.type === 'effect'
-                        ? 'linear-gradient(135deg, rgba(74, 158, 255, 0.3), rgba(255, 107, 107, 0.3))'
-                        : 'rgba(255, 255, 255, 0.1)',
+                    ls.layer.type === 'color'
+                      ? 'linear-gradient(135deg, rgba(255, 200, 100, 0.3), rgba(100, 150, 255, 0.3))'
+                      : 'linear-gradient(135deg, rgba(74, 158, 255, 0.3), rgba(255, 107, 107, 0.3))',
                   border: '1px solid rgba(255,255,255,0.1)',
                   mixBlendMode:
                     ls.layer.blendMode === 'normal' ? 'normal' : (ls.layer.blendMode as any),
@@ -513,34 +510,6 @@ export function LayerEditor() {
                     </option>
                   ))}
                 </select>
-
-                {selectedLayer.type === 'effect' && (
-                  <>
-                    <label
-                      style={{
-                        display: 'block',
-                        marginBottom: '0.5rem',
-                        fontSize: '0.75rem',
-                        color: '#888',
-                      }}
-                    >
-                      Intensity: {Math.round((selectedLayer as EffectLayer).intensity * 100)}%
-                    </label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.01"
-                      value={(selectedLayer as EffectLayer).intensity}
-                      onChange={(e) =>
-                        updateLayer(selectedLayerId, {
-                          intensity: parseFloat(e.target.value),
-                        } as Partial<EffectLayer>)
-                      }
-                      style={{ width: '100%' }}
-                    />
-                  </>
-                )}
               </div>
             );
           })()

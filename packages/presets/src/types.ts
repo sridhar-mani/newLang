@@ -39,7 +39,7 @@ export interface Preset {
 export interface PresetLayer {
   type: EffectLayer['type'];
   effect: string;
-  params: Record<string, number | boolean | number[]>;
+  params: Record<string, number | boolean | number[] | string>;
   opacity: number;
   blendMode: string;
   enabled: boolean;
