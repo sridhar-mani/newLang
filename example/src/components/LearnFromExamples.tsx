@@ -1,589 +1,355 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import {
   ImageAnalyzer,
   ShaderSynthesizer,
   type StyleAnalysis,
-  type SynthesizedLayers,
 } from '@shader3d/learn-from-examples';
 
-const sampleImages = [
+// Sample image URLs for demonstration
+const SAMPLE_IMAGES = [
   {
-    name: 'Sunset',
-    url: 'https://images.unsplash.com/photo-1495616811223-4d98c6e9c869?w=400',
-    category: 'warm',
+    name: 'Golden Hour',
+    url: 'https://images.unsplash.com/photo-1507400492013-162706c8c05e?w=400',
+    description: 'Warm sunset lighting',
   },
   {
-    name: 'Neon City',
-    url: 'https://images.unsplash.com/photo-1545486332-9e0999c535b2?w=400',
-    category: 'neon',
+    name: 'Moody Portrait',
+    url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400',
+    description: 'Dramatic portrait lighting',
   },
   {
-    name: 'Forest',
-    url: 'https://images.unsplash.com/photo-1448375240586-882707db888b?w=400',
-    category: 'nature',
+    name: 'Vintage Film',
+    url: 'https://images.unsplash.com/photo-1518173946687-a4c036bc3c95?w=400',
+    description: 'Film-like color grading',
   },
   {
-    name: 'Vintage',
-    url: 'https://images.unsplash.com/photo-1501556466850-7c9fa1fccb4c?w=400',
-    category: 'retro',
-  },
-  {
-    name: 'Ocean',
-    url: 'https://images.unsplash.com/photo-1505142468610-359e7d316be0?w=400',
-    category: 'cool',
-  },
-  {
-    name: 'Abstract',
-    url: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=400',
-    category: 'abstract',
+    name: 'High Contrast',
+    url: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=400',
+    description: 'Dramatic mountain scene',
   },
 ];
 
 export function LearnFromExamples() {
-  const [analyzer] = useState(() => new ImageAnalyzer());
-  const [synthesizer] = useState(() => new ShaderSynthesizer());
-
-  const [imageUrl, setImageUrl] = useState<string>('');
-  const [analysis, setAnalysis] = useState<StyleAnalysis | null>(null);
-  const [synthesizedStyle, setSynthesizedStyle] = useState<SynthesizedLayers | null>(null);
-  const [generatedCode, setGeneratedCode] = useState('');
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [error, setError] = useState('');
+  const [analysis, setAnalysis] = useState<StyleAnalysis | null>(null);
+  const [generatedLayers, setGeneratedLayers] = useState<unknown[] | null>(null);
+  const [customImageUrl, setCustomImageUrl] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const analyzeImage = useCallback(
-    async (url: string) => {
-      setIsAnalyzing(true);
-      setError('');
-      setImageUrl(url);
+  // Initialize analyzer and synthesizer
+  const analyzerRef = useRef<ImageAnalyzer | null>(null);
+  const synthesizerRef = useRef<ShaderSynthesizer | null>(null);
 
-      try {
-        // Load image as ImageData
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        await new Promise((resolve, reject) => {
-          img.onload = resolve;
-          img.onerror = reject;
-          img.src = url;
-        });
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d')!;
-        ctx.drawImage(img, 0, 0);
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  if (!analyzerRef.current) {
+    analyzerRef.current = new ImageAnalyzer();
+  }
+  if (!synthesizerRef.current) {
+    synthesizerRef.current = new ShaderSynthesizer();
+  }
 
-        // Analyze the image
-        const result = await analyzer.analyze(imageData);
-        setAnalysis(result);
+  const analyzeImage = useCallback(async (imageUrl: string) => {
+    setIsAnalyzing(true);
+    setSelectedImage(imageUrl);
+    setAnalysis(null);
+    setGeneratedLayers(null);
 
-        // Synthesize a style from the analysis
-        const style = synthesizer.synthesize(result);
-        setSynthesizedStyle(style);
+    try {
+      // Load image and create ImageData
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
 
-        // Generate shader code - synthesizer doesn't have compile method, use placeholder
-        const code = `// Synthesized ${style.layers.length} layers with ${(style.matchScore * 100).toFixed(0)}% match\n// Layers: ${style.layers.map((l) => l.effect).join(', ')}`;
-        setGeneratedCode(code);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to analyze image');
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('Failed to load image'));
+        img.src = imageUrl;
+      });
+
+      // Create canvas to extract image data
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.min(img.width, 400); // Limit size for performance
+      canvas.height = Math.min(img.height, 400);
+      const ctx = canvas.getContext('2d');
+
+      if (!ctx) {
+        throw new Error('Failed to get canvas context');
       }
 
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+      // Analyze the image
+      const result = analyzerRef.current!.analyze(imageData);
+      setAnalysis(result);
+
+      // Synthesize layers from analysis
+      const layers = synthesizerRef.current!.synthesize(result);
+      setGeneratedLayers(layers.layers);
+    } catch (err) {
+      console.error('Analysis error:', err);
+      setAnalysis(null);
+    } finally {
       setIsAnalyzing(false);
-    },
-    [analyzer, synthesizer]
-  );
+    }
+  }, []);
 
   const handleFileUpload = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
-      if (file) {
-        const url = URL.createObjectURL(file);
-        analyzeImage(url);
-      }
+      if (!file) return;
+
+      const url = URL.createObjectURL(file);
+      analyzeImage(url);
     },
     [analyzeImage]
   );
-
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      const file = e.dataTransfer.files[0];
-      if (file && file.type.startsWith('image/')) {
-        const url = URL.createObjectURL(file);
-        analyzeImage(url);
-      }
-    },
-    [analyzeImage]
-  );
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-  }, []);
-
-  const copyCode = useCallback(() => {
-    navigator.clipboard.writeText(generatedCode);
-  }, [generatedCode]);
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '1.5rem' }}>
-      {/* Image Upload & Samples */}
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+      {/* Left Panel - Image Selection */}
       <div>
-        {/* Upload Area */}
-        <div
-          onDrop={handleDrop}
-          onDragOver={handleDragOver}
-          onClick={() => fileInputRef.current?.click()}
-          style={{
-            background: '#1a1a2e',
-            borderRadius: '12px',
-            padding: '2rem',
-            textAlign: 'center',
-            border: '2px dashed #333',
-            cursor: 'pointer',
-            marginBottom: '1rem',
-            transition: 'border-color 0.2s',
-          }}
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleFileUpload}
-            style={{ display: 'none' }}
-          />
-
-          {imageUrl ? (
-            <div style={{ position: 'relative' }}>
-              <img
-                src={imageUrl}
-                alt="Uploaded"
-                style={{
-                  maxWidth: '100%',
-                  maxHeight: '300px',
-                  borderRadius: '8px',
-                }}
-              />
-              {isAnalyzing && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    background: 'rgba(0,0,0,0.7)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    borderRadius: '8px',
-                  }}
-                >
-                  <span style={{ fontSize: '1.5rem' }}>🔍 Analyzing...</span>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div style={{ color: '#666' }}>
-              <p style={{ fontSize: '3rem', margin: '0 0 1rem 0' }}>📷</p>
-              <p style={{ margin: '0 0 0.5rem 0', fontSize: '1rem', fontWeight: 500 }}>
-                Drop an image here or click to upload
-              </p>
-              <p style={{ margin: 0, fontSize: '0.85rem' }}>
-                We'll analyze it and create a matching shader effect
-              </p>
-            </div>
-          )}
+        <div style={{ marginBottom: '1.5rem' }}>
+          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>
+            Upload your own image:
+          </label>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileUpload}
+              style={{ display: 'none' }}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              style={{
+                flex: 1,
+                padding: '0.75rem',
+                background: '#2a2a3e',
+                color: '#aaa',
+                border: '1px dashed #444',
+                borderRadius: '8px',
+                cursor: 'pointer',
+              }}
+            >
+              📁 Choose File
+            </button>
+          </div>
         </div>
 
-        {error && (
-          <div
-            style={{
-              background: '#ff4444',
-              color: 'white',
-              padding: '1rem',
-              borderRadius: '8px',
-              marginBottom: '1rem',
-            }}
-          >
-            {error}
+        <div style={{ marginBottom: '1.5rem' }}>
+          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>
+            Or enter image URL:
+          </label>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <input
+              type="url"
+              value={customImageUrl}
+              onChange={(e) => setCustomImageUrl(e.target.value)}
+              placeholder="https://example.com/image.jpg"
+              style={{
+                flex: 1,
+                padding: '0.75rem',
+                background: '#1a1a2e',
+                border: '1px solid #333',
+                borderRadius: '8px',
+                color: '#fff',
+              }}
+            />
+            <button
+              onClick={() => customImageUrl && analyzeImage(customImageUrl)}
+              disabled={!customImageUrl}
+              style={{
+                padding: '0.75rem 1rem',
+                background: customImageUrl ? '#4a9eff' : '#333',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: customImageUrl ? 'pointer' : 'not-allowed',
+              }}
+            >
+              Analyze
+            </button>
           </div>
-        )}
+        </div>
 
-        {/* Sample Images */}
         <div>
-          <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.9rem', color: '#888' }}>
-            Or try a sample image:
+          <h4 style={{ margin: '0 0 0.75rem 0', color: '#888', fontWeight: 500 }}>
+            Or try these samples:
           </h4>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: '0.75rem',
-            }}
-          >
-            {sampleImages.map((sample) => (
-              <button
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem' }}>
+            {SAMPLE_IMAGES.map((sample) => (
+              <div
                 key={sample.name}
                 onClick={() => analyzeImage(sample.url)}
-                disabled={isAnalyzing}
                 style={{
-                  background: '#1a1a2e',
-                  border: 'none',
+                  padding: '0.75rem',
+                  background: selectedImage === sample.url ? '#2a3a5e' : '#1a1a2e',
+                  border: selectedImage === sample.url ? '2px solid #4a9eff' : '2px solid #333',
                   borderRadius: '8px',
-                  padding: '0.5rem',
-                  cursor: isAnalyzing ? 'wait' : 'pointer',
-                  opacity: isAnalyzing ? 0.5 : 1,
+                  cursor: 'pointer',
+                  textAlign: 'center',
                 }}
               >
                 <div
                   style={{
-                    width: '100%',
-                    height: '80px',
-                    borderRadius: '6px',
-                    background:
-                      sample.category === 'warm'
-                        ? 'linear-gradient(135deg, #ff8c00, #ff4500)'
-                        : sample.category === 'neon'
-                          ? 'linear-gradient(135deg, #00ffff, #ff00ff)'
-                          : sample.category === 'nature'
-                            ? 'linear-gradient(135deg, #228b22, #006400)'
-                            : sample.category === 'retro'
-                              ? 'linear-gradient(135deg, #d4a574, #8b7355)'
-                              : sample.category === 'cool'
-                                ? 'linear-gradient(135deg, #1e90ff, #00bfff)'
-                                : 'linear-gradient(135deg, #9400d3, #ff1493)',
+                    height: '60px',
+                    background: '#2a2a3e',
+                    borderRadius: '4px',
+                    marginBottom: '0.5rem',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontSize: '1.5rem',
                   }}
                 >
-                  {sample.category === 'warm'
-                    ? '🌅'
-                    : sample.category === 'neon'
-                      ? '🌃'
-                      : sample.category === 'nature'
-                        ? '🌲'
-                        : sample.category === 'retro'
-                          ? '📼'
-                          : sample.category === 'cool'
-                            ? '🌊'
-                            : '🎨'}
+                  🖼️
                 </div>
-                <span
-                  style={{
-                    display: 'block',
-                    marginTop: '0.5rem',
-                    color: '#888',
-                    fontSize: '0.75rem',
-                  }}
-                >
-                  {sample.name}
-                </span>
-              </button>
+                <div style={{ fontSize: '0.85rem', fontWeight: 500 }}>{sample.name}</div>
+                <div style={{ fontSize: '0.75rem', color: '#888' }}>{sample.description}</div>
+              </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Analysis Results */}
+      {/* Right Panel - Analysis Results */}
       <div>
-        {analysis && (
-          <>
-            {/* Color Palette */}
-            <div
-              style={{
-                background: '#1a1a2e',
-                borderRadius: '12px',
-                padding: '1rem',
-                marginBottom: '1rem',
-              }}
-            >
-              <h3 style={{ margin: '0 0 0.75rem 0', fontSize: '0.9rem', color: '#888' }}>
-                🎨 Extracted Colors
-              </h3>
-              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
-                {analysis.colorProfile.dominantColors.map(
-                  (color: [number, number, number], i: number) => {
-                    const hex = `#${Math.round(color[0] * 255)
-                      .toString(16)
-                      .padStart(2, '0')}${Math.round(color[1] * 255)
-                      .toString(16)
-                      .padStart(2, '0')}${Math.round(color[2] * 255)
-                      .toString(16)
-                      .padStart(2, '0')}`;
-                    return (
-                      <div
-                        key={i}
-                        style={{
-                          width: '40px',
-                          height: '40px',
-                          borderRadius: '8px',
-                          background: hex,
-                          border: '2px solid #333',
-                        }}
-                        title={hex}
-                      />
-                    );
-                  }
-                )}
-              </div>
+        <h3 style={{ margin: '0 0 1rem 0', fontWeight: 500 }}>Style Analysis</h3>
 
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(2, 1fr)',
-                  gap: '0.5rem',
-                  fontSize: '0.75rem',
-                }}
-              >
-                <div style={{ background: '#222238', padding: '0.5rem', borderRadius: '6px' }}>
-                  <span style={{ color: '#888' }}>Brightness</span>
-                  <div
-                    style={{
-                      height: '6px',
-                      background: '#333',
-                      borderRadius: '3px',
-                      marginTop: '0.25rem',
-                      overflow: 'hidden',
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: `${analysis.toneProfile.brightness * 100}%`,
-                        height: '100%',
-                        background: '#fbbf24',
-                      }}
-                    />
-                  </div>
-                </div>
-                <div style={{ background: '#222238', padding: '0.5rem', borderRadius: '6px' }}>
-                  <span style={{ color: '#888' }}>Saturation</span>
-                  <div
-                    style={{
-                      height: '6px',
-                      background: '#333',
-                      borderRadius: '3px',
-                      marginTop: '0.25rem',
-                      overflow: 'hidden',
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: `${analysis.colorProfile.saturationLevel * 100}%`,
-                        height: '100%',
-                        background: '#f472b6',
-                      }}
-                    />
-                  </div>
-                </div>
-                <div style={{ background: '#222238', padding: '0.5rem', borderRadius: '6px' }}>
-                  <span style={{ color: '#888' }}>Contrast</span>
-                  <div
-                    style={{
-                      height: '6px',
-                      background: '#333',
-                      borderRadius: '3px',
-                      marginTop: '0.25rem',
-                      overflow: 'hidden',
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: `${analysis.toneProfile.contrast * 100}%`,
-                        height: '100%',
-                        background: '#a78bfa',
-                      }}
-                    />
-                  </div>
-                </div>
-                <div style={{ background: '#222238', padding: '0.5rem', borderRadius: '6px' }}>
-                  <span style={{ color: '#888' }}>Temperature</span>
-                  <div
-                    style={{
-                      height: '6px',
-                      background: 'linear-gradient(90deg, #60a5fa, #fbbf24)',
-                      borderRadius: '3px',
-                      marginTop: '0.25rem',
-                      position: 'relative',
-                    }}
-                  >
-                    <div
-                      style={{
-                        position: 'absolute',
-                        left: `${((analysis.colorProfile.colorTemperature + 1) / 2) * 100}%`,
-                        top: '-2px',
-                        width: '10px',
-                        height: '10px',
-                        background: '#fff',
-                        borderRadius: '50%',
-                        transform: 'translateX(-50%)',
-                        border: '2px solid #333',
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Detected Style */}
-            <div
-              style={{
-                background: '#1a1a2e',
-                borderRadius: '12px',
-                padding: '1rem',
-                marginBottom: '1rem',
-              }}
-            >
-              <h3 style={{ margin: '0 0 0.75rem 0', fontSize: '0.9rem', color: '#888' }}>
-                ✨ Detected Style
-              </h3>
-
-              <div style={{ marginBottom: '0.75rem' }}>
-                <span
-                  style={{
-                    padding: '0.4rem 0.8rem',
-                    background: '#333',
-                    borderRadius: '6px',
-                    fontSize: '0.85rem',
-                    fontWeight: 500,
-                  }}
-                >
-                  {analysis.styleMarkers.length > 0
-                    ? analysis.styleMarkers[0].type
-                    : 'auto-detected'}
-                </span>
-              </div>
-
-              <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
-                {analysis.styleMarkers.slice(0, 6).map((marker, i: number) => (
-                  <span
-                    key={i}
-                    style={{
-                      padding: '0.2rem 0.5rem',
-                      background: '#222238',
-                      borderRadius: '4px',
-                      fontSize: '0.7rem',
-                      color: '#888',
-                    }}
-                  >
-                    {marker.type}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* Synthesized Effects */}
-            {synthesizedStyle && (
-              <div
-                style={{
-                  background: '#1a1a2e',
-                  borderRadius: '12px',
-                  padding: '1rem',
-                  marginBottom: '1rem',
-                }}
-              >
-                <h3 style={{ margin: '0 0 0.75rem 0', fontSize: '0.9rem', color: '#888' }}>
-                  🔮 Synthesized Effects
-                </h3>
-
-                {synthesizedStyle.layers.map((layer, i: number) => (
-                  <div
-                    key={i}
-                    style={{
-                      background: '#222238',
-                      borderRadius: '8px',
-                      padding: '0.75rem',
-                      marginBottom: '0.5rem',
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        marginBottom: '0.5rem',
-                      }}
-                    >
-                      <span style={{ fontWeight: 500, fontSize: '0.85rem' }}>{layer.effect}</span>
-                      <span style={{ color: '#4a9eff', fontSize: '0.75rem' }}>
-                        {Math.round(layer.opacity * 100)}%
-                      </span>
-                    </div>
-                    <div style={{ fontSize: '0.7rem', color: '#666' }}>
-                      {Object.entries(layer.params).map(([key, val]) => (
-                        <span key={key} style={{ marginRight: '0.75rem' }}>
-                          {key}: {typeof val === 'number' ? val.toFixed(2) : String(val)}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
-        )}
-
-        {/* Generated Code */}
-        {generatedCode && (
+        {isAnalyzing && (
           <div
             style={{
+              padding: '3rem',
               background: '#1a1a2e',
-              borderRadius: '12px',
-              padding: '1rem',
+              borderRadius: '8px',
+              textAlign: 'center',
+              color: '#888',
             }}
           >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '0.75rem',
-              }}
-            >
-              <h3 style={{ margin: 0, fontSize: '0.9rem', color: '#888' }}>Generated Shader</h3>
-              <button
-                onClick={copyCode}
-                style={{
-                  padding: '0.4rem 0.8rem',
-                  background: '#333',
-                  border: 'none',
-                  borderRadius: '6px',
-                  color: '#888',
-                  cursor: 'pointer',
-                  fontSize: '0.75rem',
-                }}
-              >
-                📋 Copy
-              </button>
-            </div>
-            <pre
-              style={{
-                margin: 0,
-                padding: '0.75rem',
-                background: '#222238',
-                borderRadius: '8px',
-                fontSize: '0.65rem',
-                overflow: 'auto',
-                maxHeight: '200px',
-              }}
-            >
-              {generatedCode}
-            </pre>
+            <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>🔍</div>
+            Analyzing image...
           </div>
         )}
 
-        {!analysis && !isAnalyzing && (
+        {!isAnalyzing && !analysis && (
           <div
             style={{
+              padding: '3rem',
               background: '#1a1a2e',
-              borderRadius: '12px',
-              padding: '2rem',
+              borderRadius: '8px',
               textAlign: 'center',
               color: '#666',
             }}
           >
-            <p style={{ fontSize: '2rem', margin: '0 0 0.5rem 0' }}>🔮</p>
-            <p style={{ margin: 0, fontSize: '0.85rem' }}>
-              Upload an image to analyze its style and generate a matching shader
-            </p>
+            Select an image to analyze its visual style
           </div>
+        )}
+
+        {analysis && (
+          <>
+            {/* Color Profile */}
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem', color: '#888' }}>
+                Color Profile
+              </h4>
+              <div
+                style={{
+                  padding: '1rem',
+                  background: '#1a1a2e',
+                  borderRadius: '8px',
+                }}
+              >
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                  <span style={{ color: '#888' }}>Dominant Colors:</span>
+                  {analysis.colorProfile.dominantColors.slice(0, 5).map((color, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        width: '24px',
+                        height: '24px',
+                        background: `rgb(${color[0]}, ${color[1]}, ${color[2]})`,
+                        borderRadius: '4px',
+                        border: '1px solid #444',
+                      }}
+                      title={`RGB(${color.join(', ')})`}
+                    />
+                  ))}
+                </div>
+                <div style={{ fontSize: '0.85rem', color: '#aaa' }}>
+                  Temperature: {analysis.colorProfile.temperature.toFixed(2)} • Saturation:{' '}
+                  {(analysis.colorProfile.saturation * 100).toFixed(0)}%
+                </div>
+              </div>
+            </div>
+
+            {/* Tone Profile */}
+            <div style={{ marginBottom: '1.5rem' }}>
+              <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem', color: '#888' }}>
+                Tone Profile
+              </h4>
+              <div
+                style={{
+                  padding: '1rem',
+                  background: '#1a1a2e',
+                  borderRadius: '8px',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: '1rem',
+                    textAlign: 'center',
+                  }}
+                >
+                  <div>
+                    <div style={{ color: '#888', fontSize: '0.75rem' }}>Shadows</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 600 }}>
+                      {(analysis.toneProfile.shadows * 100).toFixed(0)}%
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ color: '#888', fontSize: '0.75rem' }}>Midtones</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 600 }}>
+                      {(analysis.toneProfile.midtones * 100).toFixed(0)}%
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ color: '#888', fontSize: '0.75rem' }}>Highlights</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 600 }}>
+                      {(analysis.toneProfile.highlights * 100).toFixed(0)}%
+                    </div>
+                  </div>
+                </div>
+                <div style={{ marginTop: '0.75rem', fontSize: '0.85rem', color: '#aaa' }}>
+                  Contrast: {(analysis.toneProfile.contrast * 100).toFixed(0)}%
+                </div>
+              </div>
+            </div>
+
+            {/* Generated Layers */}
+            {generatedLayers && generatedLayers.length > 0 && (
+              <div>
+                <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem', color: '#888' }}>
+                  Generated Effect Layers ({generatedLayers.length})
+                </h4>
+                <pre
+                  style={{
+                    padding: '1rem',
+                    background: '#1a1a2e',
+                    borderRadius: '8px',
+                    fontSize: '0.75rem',
+                    overflow: 'auto',
+                    maxHeight: '200px',
+                    margin: 0,
+                  }}
+                >
+                  {JSON.stringify(generatedLayers, null, 2)}
+                </pre>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

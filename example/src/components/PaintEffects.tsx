@@ -1,471 +1,288 @@
-import { useRef, useState, useCallback, useEffect } from 'react';
-import {
-  PaintCanvas,
-  GestureRecognizer,
-  EffectGenerator,
-  type Gesture,
-  type GestureType,
-  type PaintEffect,
-} from '@shader3d/paint-effects';
+import { useState, useRef, useCallback } from 'react';
+import { GestureRecognizer, type RecognizedGesture } from '@shader3d/paint-effects';
 
-interface GestureInfo {
-  type: GestureType;
-  name: string;
-  description: string;
-  icon: string;
+interface Stroke {
+  id: string;
+  points: { x: number; y: number }[];
+  gesture: RecognizedGesture | null;
 }
 
-const gestureGuide: GestureInfo[] = [
-  { type: 'circle', name: 'Circle', description: 'Draw a circle for radial effects', icon: '⭕' },
-  { type: 'line', name: 'Line', description: 'Straight line for directional blur', icon: '📏' },
-  { type: 'spiral', name: 'Spiral', description: 'Spiral for swirl/twist effects', icon: '🌀' },
-  { type: 'zigzag', name: 'Zigzag', description: 'Zigzag for distortion effects', icon: '⚡' },
-  { type: 'cross', name: 'Cross', description: 'Cross for bloom/glow', icon: '✚' },
-  { type: 'star', name: 'Star', description: 'Star shape for sparkle effects', icon: '⭐' },
-  { type: 'heart', name: 'Heart', description: 'Heart for vignette/focus', icon: '❤️' },
-  { type: 'wave', name: 'Wave', description: 'Wavy line for ripple effects', icon: '🌊' },
-];
+// Map gestures to shader effects
+const GESTURE_EFFECTS: Record<string, { name: string; description: string; icon: string }> = {
+  circle: { name: 'Radial Blur', description: 'Blur radiating from center', icon: '⭕' },
+  line: { name: 'Motion Blur', description: 'Directional blur along the line', icon: '➖' },
+  zigzag: { name: 'Wave Distortion', description: 'Wavy distortion effect', icon: '〰️' },
+  spiral: { name: 'Swirl', description: 'Spiral distortion', icon: '🌀' },
+  scribble: { name: 'Noise/Grain', description: 'Add film grain effect', icon: '✏️' },
+  triangle: { name: 'Sharpen', description: 'Edge sharpening', icon: '🔺' },
+  rectangle: { name: 'Vignette', description: 'Darkened edges', icon: '⬜' },
+};
 
 export function PaintEffects() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [paintCanvas, setPaintCanvas] = useState<PaintCanvas | null>(null);
-  const [recognizer] = useState(() => new GestureRecognizer());
-  const [generator] = useState(() => new EffectGenerator());
-
   const [isDrawing, setIsDrawing] = useState(false);
-  const [detectedGesture, setDetectedGesture] = useState<Gesture | null>(null);
-  const [generatedEffect, setGeneratedEffect] = useState<PaintEffect | null>(null);
-  const [generatedCode, setGeneratedCode] = useState<string>('');
-  const [history, setHistory] = useState<Array<{ gesture: Gesture; effect: PaintEffect }>>([]);
-  const [brushSize, setBrushSize] = useState(5);
-  const [brushColor, setBrushColor] = useState('#4a9eff');
+  const [currentStroke, setCurrentStroke] = useState<{ x: number; y: number }[]>([]);
+  const [strokes, setStrokes] = useState<Stroke[]>([]);
+  const [recognizedEffects, setRecognizedEffects] = useState<string[]>([]);
 
-  useEffect(() => {
-    if (canvasRef.current) {
-      const canvas = new PaintCanvas(canvasRef.current, {
-        gestureThreshold: 0.7,
-        minStrokeLength: brushSize * 4,
-      });
-      setPaintCanvas(canvas);
+  // Gesture recognizer instance
+  const recognizerRef = useRef<GestureRecognizer | null>(null);
+  if (!recognizerRef.current) {
+    recognizerRef.current = new GestureRecognizer();
+  }
 
-      return () => {
-        canvas.dispose();
-      };
-    }
+  const getCanvasPoint = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    };
   }, []);
 
-  useEffect(() => {
-    if (paintCanvas) {
-      paintCanvas.setLineWidth(brushSize);
-      paintCanvas.setColor(brushColor);
-    }
-  }, [paintCanvas, brushSize, brushColor]);
-
-  const handlePointerDown = useCallback(
-    (_e: React.PointerEvent) => {
-      if (!paintCanvas) return;
+  const startDrawing = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
       setIsDrawing(true);
-      setDetectedGesture(null);
-      setGeneratedEffect(null);
+      const point = getCanvasPoint(e);
+      setCurrentStroke([point]);
     },
-    [paintCanvas]
+    [getCanvasPoint]
   );
 
-  const handlePointerMove = useCallback(
-    (_e: React.PointerEvent) => {
-      if (!paintCanvas || !isDrawing) return;
+  const draw = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      if (!isDrawing) return;
+      const point = getCanvasPoint(e);
+      setCurrentStroke((prev) => [...prev, point]);
+
+      // Draw on canvas
+      const canvas = canvasRef.current;
+      const ctx = canvas?.getContext('2d');
+      if (!ctx || currentStroke.length === 0) return;
+
+      ctx.strokeStyle = '#4a9eff';
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      const lastPoint = currentStroke[currentStroke.length - 1];
+      ctx.beginPath();
+      ctx.moveTo(lastPoint.x, lastPoint.y);
+      ctx.lineTo(point.x, point.y);
+      ctx.stroke();
     },
-    [paintCanvas, isDrawing]
+    [isDrawing, currentStroke, getCanvasPoint]
   );
 
-  const handlePointerUp = useCallback(() => {
-    if (!paintCanvas || !isDrawing) return;
-    setIsDrawing(false);
+  const endDrawing = useCallback(() => {
+    if (!isDrawing || currentStroke.length < 3) {
+      setIsDrawing(false);
+      setCurrentStroke([]);
+      return;
+    }
 
-    // Get latest effect from canvas
-    const effects = paintCanvas.getEffects();
-    if (effects.length > 0) {
-      const latestEffect = effects[effects.length - 1];
-      setGeneratedEffect(latestEffect);
+    // Recognize the gesture
+    const gesture = recognizerRef.current?.recognize(currentStroke) ?? null;
 
-      // Generate WGSL code (placeholder)
-      const code = `// Generated effect: ${latestEffect.effect}\n// Type: ${latestEffect.layerType}\n// Opacity: ${(latestEffect.opacity * 100).toFixed(0)}%`;
-      setGeneratedCode(code);
+    const stroke: Stroke = {
+      id: crypto.randomUUID(),
+      points: currentStroke,
+      gesture,
+    };
 
-      const session = paintCanvas.getSession();
-      const gesture = session.recognizedGestures[session.recognizedGestures.length - 1];
-      if (gesture) {
-        setDetectedGesture(gesture);
-        setHistory((prev) => [...prev.slice(-9), { gesture, effect: latestEffect }]);
+    setStrokes((prev) => [...prev, stroke]);
+
+    if (gesture) {
+      const effectInfo = GESTURE_EFFECTS[gesture.type];
+      if (effectInfo) {
+        setRecognizedEffects((prev) => [...prev, `${effectInfo.icon} ${effectInfo.name}`]);
       }
     }
-  }, [paintCanvas, isDrawing, recognizer, generator]);
+
+    setIsDrawing(false);
+    setCurrentStroke([]);
+  }, [isDrawing, currentStroke]);
 
   const clearCanvas = useCallback(() => {
-    if (paintCanvas) {
-      paintCanvas.clear();
-      setDetectedGesture(null);
-      setGeneratedEffect(null);
-      setGeneratedCode('');
-    }
-  }, [paintCanvas]);
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!ctx || !canvas) return;
 
-  const copyCode = useCallback(() => {
-    navigator.clipboard.writeText(generatedCode);
-  }, [generatedCode]);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    setStrokes([]);
+    setRecognizedEffects([]);
+  }, []);
+
+  const generateShader = useCallback(() => {
+    if (recognizedEffects.length === 0) return null;
+
+    // Generate a simple combined shader from recognized effects
+    const effects = strokes
+      .filter((s) => s.gesture)
+      .map((s) => GESTURE_EFFECTS[s.gesture!.type]?.name)
+      .filter(Boolean);
+
+    return `// Generated shader from ${effects.length} gesture(s)
+// Effects: ${effects.join(', ')}
+
+fn fragmentMain(uv: vec2f) -> vec4f {
+  var color = sampleTexture(uv);
+  ${effects.includes('Radial Blur') ? '\n  color = radialBlur(color, uv, 0.5);' : ''}
+  ${effects.includes('Motion Blur') ? '\n  color = motionBlur(color, uv, vec2f(1.0, 0.0));' : ''}
+  ${effects.includes('Wave Distortion') ? '\n  color = waveDistort(color, uv, 0.02);' : ''}
+  ${effects.includes('Noise/Grain') ? '\n  color = addGrain(color, 0.1);' : ''}
+  ${effects.includes('Vignette') ? '\n  color = applyVignette(color, uv, 0.5);' : ''}
+  return color;
+}`;
+  }, [strokes, recognizedEffects]);
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: '1.5rem' }}>
-      {/* Canvas Area */}
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '1.5rem' }}>
+      {/* Left Panel - Drawing Canvas */}
       <div>
-        <div
-          style={{
-            background: '#1a1a2e',
-            borderRadius: '12px',
-            padding: '1rem',
-            marginBottom: '1rem',
-          }}
-        >
-          <canvas
-            ref={canvasRef}
-            width={600}
-            height={400}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerLeave={handlePointerUp}
-            style={{
-              width: '100%',
-              height: '400px',
-              borderRadius: '8px',
-              background: '#0a0a0f',
-              cursor: 'crosshair',
-              touchAction: 'none',
-            }}
-          />
-        </div>
-
-        {/* Controls */}
-        <div
-          style={{
-            display: 'flex',
-            gap: '1rem',
-            alignItems: 'center',
-            marginBottom: '1rem',
-          }}
-        >
-          <div>
-            <label style={{ fontSize: '0.75rem', color: '#888', marginRight: '0.5rem' }}>
-              Brush Size: {brushSize}px
-            </label>
-            <input
-              type="range"
-              min="1"
-              max="20"
-              value={brushSize}
-              onChange={(e) => setBrushSize(parseInt(e.target.value))}
-              style={{ width: '100px' }}
-            />
-          </div>
-
-          <div>
-            <label style={{ fontSize: '0.75rem', color: '#888', marginRight: '0.5rem' }}>
-              Color:
-            </label>
-            <input
-              type="color"
-              value={brushColor}
-              onChange={(e) => setBrushColor(e.target.value)}
-              style={{
-                width: '32px',
-                height: '32px',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-              }}
-            />
-          </div>
-
+        <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between' }}>
+          <p style={{ margin: 0, color: '#888' }}>
+            Draw gestures to create effects. Try circles, lines, spirals, or scribbles!
+          </p>
           <button
             onClick={clearCanvas}
             style={{
               padding: '0.5rem 1rem',
-              background: '#333',
+              background: '#4a2a2a',
+              color: '#f88',
               border: 'none',
               borderRadius: '6px',
-              color: '#888',
               cursor: 'pointer',
-              marginLeft: 'auto',
             }}
           >
-            🗑️ Clear
+            Clear
           </button>
         </div>
 
-        {/* Gesture Guide */}
-        <div
+        <canvas
+          ref={canvasRef}
+          width={600}
+          height={400}
+          onMouseDown={startDrawing}
+          onMouseMove={draw}
+          onMouseUp={endDrawing}
+          onMouseLeave={endDrawing}
           style={{
             background: '#1a1a2e',
             borderRadius: '12px',
-            padding: '1rem',
+            border: '2px solid #333',
+            cursor: 'crosshair',
+            display: 'block',
+            width: '100%',
           }}
-        >
-          <h3 style={{ margin: '0 0 1rem 0', fontSize: '0.9rem', color: '#888' }}>Gesture Guide</h3>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(4, 1fr)',
-              gap: '0.5rem',
-            }}
-          >
-            {gestureGuide.map((g) => (
+        />
+
+        {/* Gesture Legend */}
+        <div style={{ marginTop: '1rem' }}>
+          <h4 style={{ margin: '0 0 0.5rem 0', color: '#888', fontSize: '0.9rem' }}>
+            Gesture Reference:
+          </h4>
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+            {Object.entries(GESTURE_EFFECTS).map(([gesture, info]) => (
               <div
-                key={g.type}
+                key={gesture}
                 style={{
-                  padding: '0.75rem',
-                  background: detectedGesture?.type === g.type ? '#2a2a4e' : '#222238',
-                  borderRadius: '8px',
-                  textAlign: 'center',
-                  border:
-                    detectedGesture?.type === g.type
-                      ? '1px solid #4a9eff'
-                      : '1px solid transparent',
+                  padding: '0.5rem 0.75rem',
+                  background: '#2a2a3e',
+                  borderRadius: '6px',
+                  fontSize: '0.8rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
                 }}
               >
-                <div style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>{g.icon}</div>
-                <div style={{ fontSize: '0.75rem', fontWeight: 500 }}>{g.name}</div>
-                <div style={{ fontSize: '0.65rem', color: '#666', marginTop: '0.25rem' }}>
-                  {g.description}
-                </div>
+                <span>{info.icon}</span>
+                <span style={{ color: '#888' }}>{gesture}</span>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Right Panel */}
+      {/* Right Panel - Recognized Effects */}
       <div>
-        {/* Detection Result */}
-        <div
-          style={{
-            background: '#1a1a2e',
-            borderRadius: '12px',
-            padding: '1rem',
-            marginBottom: '1rem',
-          }}
-        >
-          <h3 style={{ margin: '0 0 1rem 0', fontSize: '0.9rem', color: '#888' }}>
-            Detected Gesture
-          </h3>
+        <h3 style={{ margin: '0 0 1rem 0', fontWeight: 500 }}>Recognized Effects</h3>
 
-          {detectedGesture ? (
-            <div>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  marginBottom: '1rem',
-                }}
-              >
-                <span style={{ fontSize: '2rem' }}>
-                  {gestureGuide.find((g) => g.type === detectedGesture.type)?.icon || '❓'}
-                </span>
-                <div>
-                  <div style={{ fontWeight: 600 }}>
-                    {detectedGesture.type.charAt(0).toUpperCase() + detectedGesture.type.slice(1)}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: '0.75rem',
-                      color: detectedGesture.confidence > 0.7 ? '#4ade80' : '#fbbf24',
-                    }}
-                  >
-                    {Math.round(detectedGesture.confidence * 100)}% confidence
-                  </div>
-                </div>
-              </div>
-
-              {/* Gesture metadata */}
-              <div
-                style={{
-                  background: '#222238',
-                  borderRadius: '8px',
-                  padding: '0.75rem',
-                  fontSize: '0.75rem',
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    marginBottom: '0.25rem',
-                  }}
-                >
-                  <span style={{ color: '#888' }}>Center</span>
-                  <span>
-                    ({Math.round(detectedGesture.center.x)}, {Math.round(detectedGesture.center.y)})
-                  </span>
-                </div>
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    marginBottom: '0.25rem',
-                  }}
-                >
-                  <span style={{ color: '#888' }}>Size</span>
-                  <span>
-                    {Math.round(detectedGesture.bounds.width)}x
-                    {Math.round(detectedGesture.bounds.height)}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#888' }}>Scale</span>
-                  <span>{Math.round(detectedGesture.scale ?? 100)}</span>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div style={{ textAlign: 'center', color: '#666', padding: '2rem 0' }}>
-              <p style={{ fontSize: '2rem', margin: '0 0 0.5rem 0' }}>✏️</p>
-              <p style={{ margin: 0, fontSize: '0.85rem' }}>Draw a gesture on the canvas</p>
-            </div>
-          )}
-        </div>
-
-        {/* Generated Effect */}
-        {generatedEffect && (
+        {recognizedEffects.length === 0 ? (
           <div
             style={{
+              padding: '2rem',
               background: '#1a1a2e',
-              borderRadius: '12px',
-              padding: '1rem',
-              marginBottom: '1rem',
+              borderRadius: '8px',
+              textAlign: 'center',
+              color: '#666',
             }}
           >
-            <h3 style={{ margin: '0 0 0.75rem 0', fontSize: '0.9rem', color: '#888' }}>
-              Generated Effect
-            </h3>
-            <div style={{ fontSize: '0.9rem', fontWeight: 500, marginBottom: '0.5rem' }}>
-              {generatedEffect.effect}
-            </div>
-            <p style={{ fontSize: '0.75rem', color: '#888', marginBottom: '1rem' }}>
-              Type: {generatedEffect.layerType}
-            </p>
-
-            <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.75rem', color: '#888' }}>
-              Parameters
-            </h4>
-            <div
-              style={{
-                background: '#222238',
-                borderRadius: '8px',
-                padding: '0.75rem',
-                fontSize: '0.75rem',
-              }}
-            >
-              {Object.entries(generatedEffect.params).map(([key, value]) => (
-                <div
-                  key={key}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    marginBottom: '0.25rem',
-                  }}
-                >
-                  <span style={{ color: '#888' }}>{key}</span>
-                  <span style={{ color: '#4a9eff' }}>
-                    {typeof value === 'number' ? value.toFixed(3) : String(value)}
-                  </span>
-                </div>
-              ))}
-            </div>
+            Draw gestures on the canvas to generate effects
           </div>
-        )}
-
-        {/* Generated Code */}
-        {generatedCode && (
-          <div
-            style={{
-              background: '#1a1a2e',
-              borderRadius: '12px',
-              padding: '1rem',
-              marginBottom: '1rem',
-            }}
-          >
+        ) : (
+          <>
             <div
               style={{
                 display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '0.75rem',
+                flexDirection: 'column',
+                gap: '0.5rem',
+                marginBottom: '1.5rem',
               }}
             >
-              <h3 style={{ margin: 0, fontSize: '0.9rem', color: '#888' }}>Shader Code</h3>
-              <button
-                onClick={copyCode}
-                style={{
-                  padding: '0.4rem 0.8rem',
-                  background: '#333',
-                  border: 'none',
-                  borderRadius: '6px',
-                  color: '#888',
-                  cursor: 'pointer',
-                  fontSize: '0.75rem',
-                }}
-              >
-                📋 Copy
-              </button>
-            </div>
-            <pre
-              style={{
-                margin: 0,
-                padding: '0.75rem',
-                background: '#222238',
-                borderRadius: '8px',
-                fontSize: '0.65rem',
-                overflow: 'auto',
-                maxHeight: '150px',
-              }}
-            >
-              {generatedCode}
-            </pre>
-          </div>
-        )}
-
-        {/* History */}
-        {history.length > 0 && (
-          <div
-            style={{
-              background: '#1a1a2e',
-              borderRadius: '12px',
-              padding: '1rem',
-            }}
-          >
-            <h3 style={{ margin: '0 0 0.75rem 0', fontSize: '0.9rem', color: '#888' }}>
-              Recent Effects
-            </h3>
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-              {history.map((item, index) => (
+              {recognizedEffects.map((effect, index) => (
                 <div
                   key={index}
                   style={{
-                    padding: '0.5rem',
-                    background: '#222238',
+                    padding: '0.75rem',
+                    background: '#2a2a3e',
                     borderRadius: '6px',
-                    fontSize: '0.75rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.25rem',
                   }}
                 >
-                  <span>{gestureGuide.find((g) => g.type === item.gesture.type)?.icon}</span>
-                  <span>{item.effect.effect}</span>
+                  {effect}
                 </div>
               ))}
             </div>
-          </div>
+
+            <button
+              onClick={() => {
+                const shader = generateShader();
+                if (shader) {
+                  console.log('Generated shader:', shader);
+                  alert('Shader generated! Check console for output.');
+                }
+              }}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                background: '#4a9eff',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontWeight: 600,
+              }}
+            >
+              🔧 Generate Shader
+            </button>
+
+            {generateShader() && (
+              <pre
+                style={{
+                  marginTop: '1rem',
+                  padding: '1rem',
+                  background: '#1a1a2e',
+                  borderRadius: '8px',
+                  fontSize: '0.75rem',
+                  overflow: 'auto',
+                  maxHeight: '200px',
+                }}
+              >
+                {generateShader()}
+              </pre>
+            )}
+          </>
         )}
       </div>
     </div>

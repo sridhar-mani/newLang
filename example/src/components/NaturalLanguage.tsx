@@ -1,529 +1,294 @@
-import { useState, useCallback } from 'react';
-import {
-  SessionManager,
-  parseNaturalLanguage,
-  LayerGenerator,
-  type ParsedIntent,
-  type Slider,
-} from '@shader3d/natural-language';
+import { useState, useMemo } from 'react';
+import { NLParser, LayerGenerator, type ParsedIntent } from '@shader3d/natural-language';
 
-const examplePrompts = [
-  'Make it look warm and cozy with a soft glow',
-  'Add a cinematic feel with film grain and vignette',
-  'Retro VHS look with scan lines and color bleeding',
-  'Dreamy and ethereal with bloom and desaturation',
-  'Neon cyberpunk with high contrast and blue tint',
-  'Vintage sepia tone with subtle noise',
-  'Underwater effect with blue-green color shift',
-  'Horror movie style with high contrast and red tint',
+// Example prompts to try
+const EXAMPLE_PROMPTS = [
+  'Make it look like a warm sunset with soft glow',
+  'Add a vintage film look with grain',
+  'Create a dramatic noir effect with high contrast',
+  'Make it dreamy with soft focus and light leaks',
+  'Add a cyberpunk neon glow effect',
+  'Apply a cold, desaturated winter mood',
 ];
 
 export function NaturalLanguage() {
-  const [sessionManager] = useState(() => new SessionManager());
-  const [generator] = useState(() => new LayerGenerator());
-  const [input, setInput] = useState('');
-  const [parsedEffect, setParsedEffect] = useState<ParsedIntent | null>(null);
-  const [sliders, setSliders] = useState<Slider[]>([]);
-  const [sliderValues, setSliderValues] = useState<Record<string, number>>({});
-  const [generatedCode, setGeneratedCode] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [conversation, setConversation] = useState<
-    Array<{
-      role: 'user' | 'assistant';
-      content: string;
-      effect?: ParsedIntent;
-    }>
-  >([]);
+  const [inputText, setInputText] = useState('');
+  const [parsedResult, setParsedResult] = useState<ParsedIntent | null>(null);
+  const [generatedLayers, setGeneratedLayers] = useState<unknown[] | null>(null);
 
-  const processInput = useCallback(
-    async (text: string) => {
-      if (!text.trim()) return;
+  // Initialize parser and generator
+  const parser = useMemo(() => new NLParser(), []);
+  const generator = useMemo(() => new LayerGenerator(), []);
 
-      setIsProcessing(true);
+  const processInput = () => {
+    if (!inputText.trim()) return;
 
-      // Add user message to conversation
-      setConversation((prev) => [...prev, { role: 'user', content: text }]);
+    // Step 1: Parse natural language into structured intent
+    const parsed = parser.parse(inputText);
+    setParsedResult(parsed);
 
-      try {
-        // Parse the natural language input
-        const parsed = parseNaturalLanguage(text);
-        setParsedEffect(parsed);
+    // Step 2: Generate layer configuration from intent
+    const layers = generator.generate(parsed);
+    setGeneratedLayers(layers);
+  };
 
-        // Generate layers and sliders
-        const layers = generator.generate(parsed);
-        const effectSliders = generator.generateSliders(layers);
-        setSliders(effectSliders);
-
-        // Initialize slider values
-        const initialValues: Record<string, number> = {};
-        effectSliders.forEach((slider: Slider) => {
-          initialValues[slider.id] = slider.value;
-        });
-        setSliderValues(initialValues);
-
-        // Generate initial shader code (placeholder)
-        const code = `// Generated ${layers.length} layers\n${layers.map((l) => `// - ${l.effect} (${l.type})`).join('\n')}`;
-        setGeneratedCode(code);
-
-        // Add assistant response
-        const response =
-          `I'll create effects with ${parsed.effects.map((e) => e.effectWord.effectName).join(', ')}. ` +
-          `Use the sliders below to fine-tune the result.`;
-        setConversation((prev) => [
-          ...prev,
-          { role: 'assistant', content: response, effect: parsed },
-        ]);
-      } catch (err) {
-        setConversation((prev) => [
-          ...prev,
-          {
-            role: 'assistant',
-            content: `Sorry, I couldn't understand that. Try describing the visual effect you want, like "warm glow" or "vintage film look".`,
-          },
-        ]);
-      }
-
-      setInput('');
-      setIsProcessing(false);
-    },
-    [sessionManager]
-  );
-
-  const handleSliderChange = useCallback(
-    (sliderId: string, value: number) => {
-      const newValues = { ...sliderValues, [sliderId]: value };
-      setSliderValues(newValues);
-
-      if (parsedEffect) {
-        const layers = generator.generate(parsedEffect);
-        const code = `// Updated layers with slider values\n${layers.map((l) => `// - ${l.effect} (${l.type})`).join('\n')}`;
-        setGeneratedCode(code);
-      }
-    },
-    [sliderValues, parsedEffect, generator]
-  );
-
-  const handleExampleClick = useCallback(
-    (prompt: string) => {
-      setInput(prompt);
-      processInput(prompt);
-    },
-    [processInput]
-  );
-
-  const handleSubmit = useCallback(
-    (e: React.FormEvent) => {
-      e.preventDefault();
-      processInput(input);
-    },
-    [input, processInput]
-  );
-
-  const copyCode = useCallback(() => {
-    navigator.clipboard.writeText(generatedCode);
-  }, [generatedCode]);
-
-  const clearConversation = useCallback(() => {
-    setConversation([]);
-    setParsedEffect(null);
-    setSliders([]);
-    setSliderValues({});
-    setGeneratedCode('');
-  }, []);
+  const tryExample = (prompt: string) => {
+    setInputText(prompt);
+    // Auto-process after setting
+    setTimeout(() => {
+      const parsed = parser.parse(prompt);
+      setParsedResult(parsed);
+      const layers = generator.generate(parsed);
+      setGeneratedLayers(layers);
+    }, 0);
+  };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '1.5rem' }}>
-      {/* Chat Interface */}
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+      {/* Left Panel - Input */}
       <div>
-        <div
-          style={{
-            background: '#1a1a2e',
-            borderRadius: '12px',
-            padding: '1rem',
-            marginBottom: '1rem',
-            minHeight: '400px',
-            maxHeight: '500px',
-            overflow: 'auto',
-          }}
-        >
-          {conversation.length === 0 ? (
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '300px',
-                color: '#666',
-              }}
-            >
-              <p style={{ fontSize: '3rem', margin: '0 0 1rem 0' }}>💬</p>
-              <p style={{ margin: '0 0 0.5rem 0', fontSize: '1.1rem', fontWeight: 500 }}>
-                Describe your effect in plain English
-              </p>
-              <p style={{ margin: 0, fontSize: '0.85rem' }}>
-                Try: "warm sunset glow", "vintage film look", or "cyberpunk neon"
-              </p>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {conversation.map((msg, index) => (
-                <div
-                  key={index}
-                  style={{
-                    display: 'flex',
-                    justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                  }}
-                >
-                  <div
-                    style={{
-                      maxWidth: '80%',
-                      padding: '0.75rem 1rem',
-                      borderRadius: '12px',
-                      background: msg.role === 'user' ? '#4a9eff' : '#2a2a3e',
-                      color: msg.role === 'user' ? '#fff' : '#ddd',
-                    }}
-                  >
-                    <p style={{ margin: 0, fontSize: '0.9rem' }}>{msg.content}</p>
-
-                    {msg.effect && (
-                      <div
-                        style={{
-                          marginTop: '0.75rem',
-                          padding: '0.5rem',
-                          background: 'rgba(0,0,0,0.2)',
-                          borderRadius: '6px',
-                          fontSize: '0.75rem',
-                        }}
-                      >
-                        <strong>Detected effects:</strong>
-                        <div
-                          style={{
-                            display: 'flex',
-                            gap: '0.25rem',
-                            flexWrap: 'wrap',
-                            marginTop: '0.25rem',
-                          }}
-                        >
-                          {msg.effect.effects.map((e, i: number) => (
-                            <span
-                              key={i}
-                              style={{
-                                padding: '0.2rem 0.5rem',
-                                background: 'rgba(74, 158, 255, 0.3)',
-                                borderRadius: '4px',
-                              }}
-                            >
-                              {e.effectWord.effectName}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Input Form */}
-        <form
-          onSubmit={handleSubmit}
-          style={{
-            display: 'flex',
-            gap: '0.5rem',
-            marginBottom: '1rem',
-          }}
-        >
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Describe the effect you want..."
-            disabled={isProcessing}
+        <div style={{ marginBottom: '1rem' }}>
+          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500 }}>
+            Describe the effect you want:
+          </label>
+          <textarea
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            placeholder="e.g., Make it look like a warm sunset with a soft glow..."
             style={{
-              flex: 1,
-              padding: '0.75rem 1rem',
+              width: '100%',
+              height: '120px',
+              padding: '1rem',
               background: '#1a1a2e',
               border: '1px solid #333',
               borderRadius: '8px',
               color: '#fff',
-              fontSize: '0.9rem',
+              fontSize: '1rem',
+              resize: 'vertical',
             }}
           />
-          <button
-            type="submit"
-            disabled={isProcessing || !input.trim()}
-            style={{
-              padding: '0.75rem 1.5rem',
-              background: isProcessing ? '#333' : '#4a9eff',
-              border: 'none',
-              borderRadius: '8px',
-              color: 'white',
-              cursor: isProcessing ? 'wait' : 'pointer',
-              fontWeight: 500,
-            }}
-          >
-            {isProcessing ? '...' : 'Create'}
-          </button>
-          {conversation.length > 0 && (
-            <button
-              type="button"
-              onClick={clearConversation}
-              style={{
-                padding: '0.75rem 1rem',
-                background: '#333',
-                border: 'none',
-                borderRadius: '8px',
-                color: '#888',
-                cursor: 'pointer',
-              }}
-            >
-              🗑️
-            </button>
-          )}
-        </form>
+        </div>
 
-        {/* Example Prompts */}
+        <button
+          onClick={processInput}
+          disabled={!inputText.trim()}
+          style={{
+            padding: '0.75rem 2rem',
+            background: inputText.trim() ? '#4a9eff' : '#333',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: inputText.trim() ? 'pointer' : 'not-allowed',
+            fontWeight: 600,
+            fontSize: '1rem',
+            marginBottom: '1.5rem',
+          }}
+        >
+          🪄 Generate Effect
+        </button>
+
         <div>
-          <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.8rem', color: '#888' }}>
+          <h4 style={{ margin: '0 0 0.75rem 0', color: '#888', fontWeight: 500 }}>
             Try these examples:
           </h4>
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            {examplePrompts.map((prompt, index) => (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {EXAMPLE_PROMPTS.map((prompt, index) => (
               <button
                 key={index}
-                onClick={() => handleExampleClick(prompt)}
+                onClick={() => tryExample(prompt)}
                 style={{
-                  padding: '0.5rem 0.75rem',
+                  padding: '0.75rem',
                   background: '#2a2a3e',
+                  color: '#aaa',
                   border: 'none',
                   borderRadius: '6px',
-                  color: '#888',
                   cursor: 'pointer',
-                  fontSize: '0.75rem',
+                  textAlign: 'left',
+                  fontSize: '0.9rem',
                 }}
               >
-                "{prompt.length > 30 ? prompt.slice(0, 30) + '...' : prompt}"
+                "{prompt}"
               </button>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Controls & Output */}
+      {/* Right Panel - Results */}
       <div>
-        {/* Effect Sliders */}
-        {sliders.length > 0 && (
+        <h3 style={{ margin: '0 0 1rem 0', fontWeight: 500 }}>Analysis Result</h3>
+
+        {!parsedResult ? (
           <div
             style={{
+              padding: '3rem',
               background: '#1a1a2e',
-              borderRadius: '12px',
-              padding: '1rem',
-              marginBottom: '1rem',
-            }}
-          >
-            <h3 style={{ margin: '0 0 1rem 0', fontSize: '0.9rem', color: '#888' }}>
-              🎛️ Fine-tune Your Effect
-            </h3>
-
-            {sliders.map((slider) => (
-              <div key={slider.id} style={{ marginBottom: '1rem' }}>
-                <label
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    fontSize: '0.8rem',
-                    color: '#888',
-                    marginBottom: '0.25rem',
-                  }}
-                >
-                  <span>{slider.label}</span>
-                  <span style={{ color: '#4a9eff' }}>
-                    {sliderValues[slider.id]?.toFixed(2) ?? slider.value.toFixed(2)}
-                  </span>
-                </label>
-                <input
-                  type="range"
-                  min={slider.min}
-                  max={slider.max}
-                  step={slider.step}
-                  value={sliderValues[slider.id] ?? slider.value}
-                  onChange={(e) => handleSliderChange(slider.id, parseFloat(e.target.value))}
-                  style={{ width: '100%' }}
-                />
-                <div style={{ fontSize: '0.7rem', color: '#666' }}>{slider.unit || ''}</div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Parsed Effect Details */}
-        {parsedEffect && (
-          <div
-            style={{
-              background: '#1a1a2e',
-              borderRadius: '12px',
-              padding: '1rem',
-              marginBottom: '1rem',
-            }}
-          >
-            <h3 style={{ margin: '0 0 0.75rem 0', fontSize: '0.9rem', color: '#888' }}>
-              Understood Intent
-            </h3>
-
-            <div style={{ marginBottom: '0.75rem' }}>
-              <span
-                style={{
-                  fontSize: '0.75rem',
-                  color: '#888',
-                  display: 'block',
-                  marginBottom: '0.25rem',
-                }}
-              >
-                Confidence
-              </span>
-              <span
-                style={{
-                  padding: '0.25rem 0.5rem',
-                  background: '#333',
-                  borderRadius: '4px',
-                  fontSize: '0.8rem',
-                }}
-              >
-                {Math.round(parsedEffect.confidence * 100)}%
-              </span>
-            </div>
-
-            <div style={{ marginBottom: '0.75rem' }}>
-              <span
-                style={{
-                  fontSize: '0.75rem',
-                  color: '#888',
-                  display: 'block',
-                  marginBottom: '0.25rem',
-                }}
-              >
-                Detected Colors
-              </span>
-              <div style={{ display: 'flex', gap: '0.25rem' }}>
-                {parsedEffect.effects
-                  .flatMap((e) => e.colors)
-                  .map((color, i: number) => {
-                    const hex = `#${Math.round(color.rgb[0] * 255)
-                      .toString(16)
-                      .padStart(2, '0')}${Math.round(color.rgb[1] * 255)
-                      .toString(16)
-                      .padStart(2, '0')}${Math.round(color.rgb[2] * 255)
-                      .toString(16)
-                      .padStart(2, '0')}`;
-                    return (
-                      <div
-                        key={i}
-                        style={{
-                          width: '24px',
-                          height: '24px',
-                          borderRadius: '4px',
-                          background: hex,
-                          border: '1px solid #444',
-                        }}
-                        title={color.word}
-                      />
-                    );
-                  })}
-              </div>
-            </div>
-
-            <div>
-              <span
-                style={{
-                  fontSize: '0.75rem',
-                  color: '#888',
-                  display: 'block',
-                  marginBottom: '0.25rem',
-                }}
-              >
-                Effects Count
-              </span>
-              <div
-                style={{
-                  padding: '0.25rem 0.5rem',
-                  background: '#333',
-                  borderRadius: '4px',
-                  fontSize: '0.8rem',
-                }}
-              >
-                {parsedEffect.effects.length} effect(s)
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Generated Code */}
-        {generatedCode && (
-          <div
-            style={{
-              background: '#1a1a2e',
-              borderRadius: '12px',
-              padding: '1rem',
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '0.75rem',
-              }}
-            >
-              <h3 style={{ margin: 0, fontSize: '0.9rem', color: '#888' }}>Generated Shader</h3>
-              <button
-                onClick={copyCode}
-                style={{
-                  padding: '0.4rem 0.8rem',
-                  background: '#333',
-                  border: 'none',
-                  borderRadius: '6px',
-                  color: '#888',
-                  cursor: 'pointer',
-                  fontSize: '0.75rem',
-                }}
-              >
-                📋 Copy
-              </button>
-            </div>
-            <pre
-              style={{
-                margin: 0,
-                padding: '0.75rem',
-                background: '#222238',
-                borderRadius: '8px',
-                fontSize: '0.65rem',
-                overflow: 'auto',
-                maxHeight: '200px',
-              }}
-            >
-              {generatedCode}
-            </pre>
-          </div>
-        )}
-
-        {!parsedEffect && !generatedCode && (
-          <div
-            style={{
-              background: '#1a1a2e',
-              borderRadius: '12px',
-              padding: '2rem',
+              borderRadius: '8px',
               textAlign: 'center',
               color: '#666',
             }}
           >
-            <p style={{ fontSize: '2rem', margin: '0 0 0.5rem 0' }}>🎛️</p>
-            <p style={{ margin: 0, fontSize: '0.85rem' }}>
-              Controls will appear here after you describe an effect
-            </p>
+            Enter a description and click "Generate Effect"
           </div>
+        ) : (
+          <>
+            {/* Confidence Indicator */}
+            <div
+              style={{
+                padding: '1rem',
+                background: parsedResult.confidence > 0.7 ? '#1a4a1a' : '#4a4a1a',
+                borderRadius: '8px',
+                marginBottom: '1rem',
+              }}
+            >
+              <div
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+              >
+                <span>Confidence</span>
+                <span style={{ fontWeight: 600 }}>
+                  {Math.round(parsedResult.confidence * 100)}%
+                </span>
+              </div>
+              <div
+                style={{
+                  height: '4px',
+                  background: '#333',
+                  borderRadius: '2px',
+                  marginTop: '0.5rem',
+                  overflow: 'hidden',
+                }}
+              >
+                <div
+                  style={{
+                    width: `${parsedResult.confidence * 100}%`,
+                    height: '100%',
+                    background: parsedResult.confidence > 0.7 ? '#4a9eff' : '#ffaa00',
+                    transition: 'width 0.3s',
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Detected Effects */}
+            <div style={{ marginBottom: '1rem' }}>
+              <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem', color: '#888' }}>
+                Detected Effects ({parsedResult.effects.length})
+              </h4>
+              {parsedResult.effects.length === 0 ? (
+                <p style={{ color: '#666', margin: 0 }}>No specific effects detected</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {parsedResult.effects.map((effect, index) => (
+                    <div
+                      key={index}
+                      style={{
+                        padding: '0.75rem',
+                        background: '#2a2a3e',
+                        borderRadius: '6px',
+                      }}
+                    >
+                      <div style={{ fontWeight: 500, marginBottom: '0.25rem' }}>
+                        {effect.effectWord.word}
+                      </div>
+                      {effect.modifiers.length > 0 && (
+                        <div style={{ fontSize: '0.8rem', color: '#888' }}>
+                          Modifiers: {effect.modifiers.map((m) => m.word).join(', ')}
+                        </div>
+                      )}
+                      {effect.colors.length > 0 && (
+                        <div
+                          style={{
+                            fontSize: '0.8rem',
+                            color: '#888',
+                            display: 'flex',
+                            gap: '0.5rem',
+                            marginTop: '0.25rem',
+                          }}
+                        >
+                          Colors:
+                          {effect.colors.map((c, i) => (
+                            <span
+                              key={i}
+                              style={{
+                                display: 'inline-block',
+                                width: '16px',
+                                height: '16px',
+                                background: `rgb(${c.rgb[0] * 255}, ${c.rgb[1] * 255}, ${c.rgb[2] * 255})`,
+                                borderRadius: '3px',
+                                border: '1px solid #555',
+                              }}
+                              title={c.name}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Global Modifiers */}
+            {parsedResult.globalModifiers.length > 0 && (
+              <div style={{ marginBottom: '1rem' }}>
+                <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem', color: '#888' }}>
+                  Global Modifiers
+                </h4>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  {parsedResult.globalModifiers.map((mod, index) => (
+                    <span
+                      key={index}
+                      style={{
+                        padding: '0.35rem 0.75rem',
+                        background: '#333',
+                        borderRadius: '4px',
+                        fontSize: '0.85rem',
+                      }}
+                    >
+                      {mod.word} ({mod.effect}: {mod.value > 0 ? '+' : ''}
+                      {Math.round(mod.value * 100)}%)
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Generated Layers */}
+            {generatedLayers && generatedLayers.length > 0 && (
+              <div>
+                <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem', color: '#888' }}>
+                  Generated Layers ({generatedLayers.length})
+                </h4>
+                <pre
+                  style={{
+                    padding: '1rem',
+                    background: '#1a1a2e',
+                    borderRadius: '8px',
+                    fontSize: '0.75rem',
+                    overflow: 'auto',
+                    maxHeight: '200px',
+                    margin: 0,
+                  }}
+                >
+                  {JSON.stringify(generatedLayers, null, 2)}
+                </pre>
+              </div>
+            )}
+
+            {/* Suggestions */}
+            {parsedResult.suggestions && parsedResult.suggestions.length > 0 && (
+              <div style={{ marginTop: '1rem' }}>
+                <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem', color: '#888' }}>
+                  Suggestions
+                </h4>
+                <ul style={{ margin: 0, paddingLeft: '1.5rem', color: '#aaa' }}>
+                  {parsedResult.suggestions.map((suggestion, index) => (
+                    <li key={index}>{suggestion}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

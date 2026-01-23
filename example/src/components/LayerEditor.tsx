@@ -1,536 +1,388 @@
-import { useState, useCallback } from 'react';
-import { LayerComposition, createLayer, BlendMode, type EffectLayer } from '@shader3d/layers';
+import { useState, useMemo } from 'react';
+import { LayerComposition, createLayer, compileLayerStack } from '@shader3d/layers';
+import type { BlendMode, EffectLayer } from '@shader3d/layers';
 
-type AnyLayer = EffectLayer;
-
-interface LayerState {
-  layer: AnyLayer;
-  visible: boolean;
-  expanded: boolean;
-}
-
-const blendModes: BlendMode[] = [
+// Available blend modes
+const BLEND_MODES: BlendMode[] = [
   'normal',
+  'add',
   'multiply',
   'screen',
   'overlay',
-  'darken',
-  'lighten',
+  'softLight',
+  'hardLight',
   'colorDodge',
   'colorBurn',
-  'hardLight',
-  'softLight',
+  'darken',
+  'lighten',
   'difference',
   'exclusion',
-  'hue',
-  'saturation',
-  'color',
-  'luminosity',
 ];
 
-const effectTypes = [
-  { id: 'blur', name: 'Blur', icon: '🌫️' },
-  { id: 'glow', name: 'Glow', icon: '✨' },
-  { id: 'vignette', name: 'Vignette', icon: '🔲' },
-  { id: 'noise', name: 'Noise', icon: '📺' },
-  { id: 'chromatic-aberration', name: 'Chromatic Aberration', icon: '🌈' },
-  { id: 'pixelate', name: 'Pixelate', icon: '🎮' },
+// Effect definitions that match actual layer-types
+const AVAILABLE_EFFECTS: {
+  layerType: EffectLayer['type'];
+  effect: string;
+  name: string;
+  icon: string;
+}[] = [
+  { layerType: 'blur', effect: 'gaussian', name: 'Gaussian Blur', icon: '🌫️' },
+  { layerType: 'blur', effect: 'motion', name: 'Motion Blur', icon: '💨' },
+  { layerType: 'glow', effect: 'bloom', name: 'Bloom', icon: '✨' },
+  { layerType: 'glow', effect: 'neon', name: 'Neon Glow', icon: '🌈' },
+  { layerType: 'color', effect: 'brightnessContrast', name: 'Brightness/Contrast', icon: '☀️' },
+  { layerType: 'color', effect: 'hueSaturation', name: 'Hue/Saturation', icon: '🎨' },
+  { layerType: 'stylize', effect: 'vignette', name: 'Vignette', icon: '⭕' },
+  { layerType: 'stylize', effect: 'sharpen', name: 'Sharpen', icon: '🔪' },
+  { layerType: 'noise', effect: 'grain', name: 'Film Grain', icon: '📷' },
+  { layerType: 'distortion', effect: 'wave', name: 'Wave', icon: '🌊' },
 ];
 
-const adjustmentTypes = [
-  { id: 'brightness-contrast', name: 'Brightness/Contrast', icon: '☀️' },
-  { id: 'hue-saturation', name: 'Hue/Saturation', icon: '🎨' },
-  { id: 'levels', name: 'Levels', icon: '📊' },
-  { id: 'curves', name: 'Curves', icon: '📈' },
-  { id: 'color-balance', name: 'Color Balance', icon: '⚖️' },
-  { id: 'invert', name: 'Invert', icon: '🔄' },
-];
+interface LayerState {
+  id: string;
+  name: string;
+  layerType: EffectLayer['type'];
+  effect: string;
+  opacity: number;
+  blendMode: BlendMode;
+  visible: boolean;
+}
 
 export function LayerEditor() {
-  const [layers, setLayers] = useState<LayerState[]>([
-    {
-      layer: createLayer('blur', 'gaussian', {
-        name: 'Background Blur',
-      }),
-      visible: true,
-      expanded: false,
-    },
-  ]);
+  const [layers, setLayers] = useState<LayerState[]>([]);
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
-  const [generatedCode, setGeneratedCode] = useState<string>('');
+  const [compiledOutput, setCompiledOutput] = useState<string | null>(null);
 
-  const addEffectLayer = useCallback((effectType: string) => {
-    // Map effect IDs to actual layer types
-    const typeMap: Record<string, { type: EffectLayer['type']; effect: string }> = {
-      blur: { type: 'blur', effect: 'gaussian' },
-      glow: { type: 'glow', effect: 'bloom' },
-      vignette: { type: 'stylize', effect: 'vignette' },
-      chromatic: { type: 'stylize', effect: 'chromaticAberration' },
-      grain: { type: 'noise', effect: 'grain' },
-      distortion: { type: 'distortion', effect: 'wave' },
-    };
-    const mapping = typeMap[effectType] || { type: 'blur', effect: 'gaussian' };
-    const newLayer = createLayer(mapping.type, mapping.effect, {
-      name: `${effectType.charAt(0).toUpperCase() + effectType.slice(1)} Effect`,
-    });
-    setLayers((prev) => [...prev, { layer: newLayer, visible: true, expanded: true }]);
-    setSelectedLayerId(newLayer.id);
-  }, []);
-
-  const addAdjustmentLayer = useCallback((adjustmentType: string) => {
-    // Map adjustment IDs to color layer effects
-    const effectMap: Record<string, string> = {
-      'brightness-contrast': 'brightnessContrast',
-      'hue-saturation': 'hueSaturation',
-      vibrance: 'vibrance',
-      tint: 'tint',
-      invert: 'invert',
-    };
-    const effect = effectMap[adjustmentType] || 'brightnessContrast';
-    const newLayer = createLayer('color', effect, {
-      name: `${adjustmentType
-        .split('-')
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(' ')}`,
-    });
-    setLayers((prev) => [...prev, { layer: newLayer, visible: true, expanded: true }]);
-    setSelectedLayerId(newLayer.id);
-  }, []);
-
-  const addSolidLayer = useCallback(() => {
-    // Use a color layer with tint as a "solid" layer
-    const newLayer = createLayer('color', 'tint', {
-      name: 'Color Fill',
-      blendMode: 'overlay',
-      opacity: 0.7,
-    });
-    setLayers((prev) => [...prev, { layer: newLayer, visible: true, expanded: true }]);
-    setSelectedLayerId(newLayer.id);
-  }, []);
-
-  const updateLayer = useCallback((id: string, updates: Partial<AnyLayer>) => {
-    setLayers((prev) =>
-      prev.map((ls) =>
-        ls.layer.id === id ? { ...ls, layer: { ...ls.layer, ...updates } as AnyLayer } : ls
-      )
-    );
-  }, []);
-
-  const toggleVisibility = useCallback((id: string) => {
-    setLayers((prev) =>
-      prev.map((ls) => (ls.layer.id === id ? { ...ls, visible: !ls.visible } : ls))
-    );
-  }, []);
-
-  const deleteLayer = useCallback(
-    (id: string) => {
-      setLayers((prev) => prev.filter((ls) => ls.layer.id !== id));
-      if (selectedLayerId === id) {
-        setSelectedLayerId(null);
+  // Create a LayerComposition instance
+  const composition = useMemo(() => {
+    const comp = new LayerComposition(800, 600, 'My Effect Stack');
+    layers.forEach((layer) => {
+      try {
+        const effectLayer = createLayer(layer.layerType, layer.effect);
+        effectLayer.opacity = layer.opacity;
+        effectLayer.blendMode = layer.blendMode;
+        effectLayer.visible = layer.visible;
+        comp.addLayer(effectLayer);
+      } catch (err) {
+        console.warn('Failed to create layer:', err);
       }
-    },
-    [selectedLayerId]
-  );
-
-  const moveLayer = useCallback((id: string, direction: 'up' | 'down') => {
-    setLayers((prev) => {
-      const index = prev.findIndex((ls) => ls.layer.id === id);
-      if (index === -1) return prev;
-      const newIndex = direction === 'up' ? index + 1 : index - 1;
-      if (newIndex < 0 || newIndex >= prev.length) return prev;
-      const newLayers = [...prev];
-      [newLayers[index], newLayers[newIndex]] = [newLayers[newIndex], newLayers[index]];
-      return newLayers;
     });
-  }, []);
-
-  const generateShaderCode = useCallback(() => {
-    const composition = new LayerComposition(800, 600);
-    layers
-      .filter((ls) => ls.visible)
-      .forEach((ls) => {
-        composition.addLayer(ls.layer);
-      });
-    const result = composition.compile();
-    setGeneratedCode(result.wgsl);
+    return comp;
   }, [layers]);
 
+  const addLayer = (layerType: EffectLayer['type'], effect: string) => {
+    const effectInfo = AVAILABLE_EFFECTS.find(
+      (e) => e.layerType === layerType && e.effect === effect
+    );
+    const newLayer: LayerState = {
+      id: crypto.randomUUID(),
+      name: effectInfo?.name ?? effect,
+      layerType,
+      effect,
+      opacity: 1,
+      blendMode: 'normal',
+      visible: true,
+    };
+    setLayers([...layers, newLayer]);
+    setSelectedLayerId(newLayer.id);
+  };
+
+  const removeLayer = (layerId: string) => {
+    setLayers(layers.filter((l) => l.id !== layerId));
+    if (selectedLayerId === layerId) {
+      setSelectedLayerId(null);
+    }
+  };
+
+  const updateLayer = (layerId: string, updates: Partial<LayerState>) => {
+    setLayers(layers.map((l) => (l.id === layerId ? { ...l, ...updates } : l)));
+  };
+
+  const moveLayer = (layerId: string, direction: 'up' | 'down') => {
+    const index = layers.findIndex((l) => l.id === layerId);
+    if (index === -1) return;
+
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= layers.length) return;
+
+    const newLayers = [...layers];
+    [newLayers[index], newLayers[newIndex]] = [newLayers[newIndex], newLayers[index]];
+    setLayers(newLayers);
+  };
+
+  const compileStack = () => {
+    try {
+      const compiled = composition.compile();
+      setCompiledOutput(compiled.wgsl);
+    } catch (err) {
+      setCompiledOutput(`Error: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+
+  const selectedLayer = layers.find((l) => l.id === selectedLayerId);
+
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr 300px', gap: '1.5rem' }}>
-      {/* Layer Stack */}
-      <div
-        style={{
-          background: '#1a1a2e',
-          borderRadius: '12px',
-          padding: '1rem',
-          maxHeight: '600px',
-          overflow: 'auto',
-        }}
-      >
-        <h3 style={{ margin: '0 0 1rem 0', fontSize: '0.9rem', color: '#888' }}>Layer Stack</h3>
-
-        {[...layers].reverse().map((ls, index) => (
-          <div
-            key={ls.layer.id}
-            onClick={() => setSelectedLayerId(ls.layer.id)}
-            style={{
-              background: selectedLayerId === ls.layer.id ? '#2a2a4e' : '#222238',
-              border:
-                selectedLayerId === ls.layer.id ? '1px solid #4a9eff' : '1px solid transparent',
-              borderRadius: '8px',
-              padding: '0.75rem',
-              marginBottom: '0.5rem',
-              cursor: 'pointer',
-              opacity: ls.visible ? 1 : 0.5,
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleVisibility(ls.layer.id);
-                }}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '1rem',
-                }}
-              >
-                {ls.visible ? '👁️' : '👁️‍🗨️'}
-              </button>
-              <span style={{ flex: 1, fontSize: '0.85rem' }}>{ls.layer.name}</span>
-              <span style={{ fontSize: '0.7rem', color: '#666' }}>{ls.layer.type}</span>
-            </div>
-            <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.25rem' }}>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  moveLayer(ls.layer.id, 'up');
-                }}
-                disabled={index === 0}
-                style={{
-                  padding: '0.25rem 0.5rem',
-                  background: '#333',
-                  border: 'none',
-                  borderRadius: '4px',
-                  color: '#888',
-                  cursor: 'pointer',
-                  fontSize: '0.7rem',
-                }}
-              >
-                ↑
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  moveLayer(ls.layer.id, 'down');
-                }}
-                disabled={index === layers.length - 1}
-                style={{
-                  padding: '0.25rem 0.5rem',
-                  background: '#333',
-                  border: 'none',
-                  borderRadius: '4px',
-                  color: '#888',
-                  cursor: 'pointer',
-                  fontSize: '0.7rem',
-                }}
-              >
-                ↓
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  deleteLayer(ls.layer.id);
-                }}
-                style={{
-                  padding: '0.25rem 0.5rem',
-                  background: '#443',
-                  border: 'none',
-                  borderRadius: '4px',
-                  color: '#f88',
-                  cursor: 'pointer',
-                  fontSize: '0.7rem',
-                  marginLeft: 'auto',
-                }}
-              >
-                🗑️
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Preview & Add Layers */}
+    <div style={{ display: 'grid', gridTemplateColumns: '250px 1fr 300px', gap: '1.5rem' }}>
+      {/* Left Panel - Effect Palette */}
       <div>
-        <div
-          style={{
-            background: '#1a1a2e',
-            borderRadius: '12px',
-            height: '400px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginBottom: '1rem',
-            position: 'relative',
-            overflow: 'hidden',
-          }}
-        >
-          {/* Layer preview visualization */}
-          {layers
-            .filter((ls) => ls.visible)
-            .map((ls, index) => (
-              <div
-                key={ls.layer.id}
-                style={{
-                  position: 'absolute',
-                  inset: `${10 + index * 5}px`,
-                  borderRadius: '8px',
-                  background:
-                    ls.layer.type === 'color'
-                      ? 'linear-gradient(135deg, rgba(255, 200, 100, 0.3), rgba(100, 150, 255, 0.3))'
-                      : 'linear-gradient(135deg, rgba(74, 158, 255, 0.3), rgba(255, 107, 107, 0.3))',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  mixBlendMode:
-                    ls.layer.blendMode === 'normal' ? 'normal' : (ls.layer.blendMode as any),
-                  opacity: ls.layer.opacity,
-                }}
-              />
-            ))}
-          <span
-            style={{
-              position: 'relative',
-              color: '#666',
-              fontSize: '0.9rem',
-              textAlign: 'center',
-              padding: '1rem',
-            }}
-          >
-            Layer Composition Preview
-            <br />
-            <span style={{ fontSize: '0.75rem' }}>
-              {layers.length} layers • {layers.filter((ls) => ls.visible).length} visible
-            </span>
-          </span>
-        </div>
-
-        {/* Add Layer Buttons */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
-          <div>
-            <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.75rem', color: '#888' }}>Effects</h4>
-            {effectTypes.map((effect) => (
-              <button
-                key={effect.id}
-                onClick={() => addEffectLayer(effect.id)}
-                style={{
-                  display: 'block',
-                  width: '100%',
-                  padding: '0.5rem',
-                  marginBottom: '0.25rem',
-                  background: '#2a2a3e',
-                  border: 'none',
-                  borderRadius: '6px',
-                  color: '#ccc',
-                  cursor: 'pointer',
-                  fontSize: '0.75rem',
-                  textAlign: 'left',
-                }}
-              >
-                {effect.icon} {effect.name}
-              </button>
-            ))}
-          </div>
-          <div>
-            <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.75rem', color: '#888' }}>
-              Adjustments
-            </h4>
-            {adjustmentTypes.map((adj) => (
-              <button
-                key={adj.id}
-                onClick={() => addAdjustmentLayer(adj.id)}
-                style={{
-                  display: 'block',
-                  width: '100%',
-                  padding: '0.5rem',
-                  marginBottom: '0.25rem',
-                  background: '#2a2a3e',
-                  border: 'none',
-                  borderRadius: '6px',
-                  color: '#ccc',
-                  cursor: 'pointer',
-                  fontSize: '0.75rem',
-                  textAlign: 'left',
-                }}
-              >
-                {adj.icon} {adj.name}
-              </button>
-            ))}
-          </div>
-          <div>
-            <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.75rem', color: '#888' }}>Fills</h4>
+        <h3 style={{ margin: '0 0 1rem 0', fontWeight: 500 }}>Add Effects</h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          {AVAILABLE_EFFECTS.map((effect) => (
             <button
-              onClick={addSolidLayer}
-              style={{
-                display: 'block',
-                width: '100%',
-                padding: '0.5rem',
-                marginBottom: '0.25rem',
-                background: '#2a2a3e',
-                border: 'none',
-                borderRadius: '6px',
-                color: '#ccc',
-                cursor: 'pointer',
-                fontSize: '0.75rem',
-                textAlign: 'left',
-              }}
-            >
-              🎨 Solid Color
-            </button>
-          </div>
-        </div>
-
-        <button
-          onClick={generateShaderCode}
-          style={{
-            marginTop: '1rem',
-            padding: '0.75rem 1.5rem',
-            background: '#4a9eff',
-            border: 'none',
-            borderRadius: '8px',
-            color: 'white',
-            cursor: 'pointer',
-            width: '100%',
-            fontWeight: 600,
-          }}
-        >
-          Generate Shader Code
-        </button>
-      </div>
-
-      {/* Properties Panel */}
-      <div
-        style={{
-          background: '#1a1a2e',
-          borderRadius: '12px',
-          padding: '1rem',
-        }}
-      >
-        <h3 style={{ margin: '0 0 1rem 0', fontSize: '0.9rem', color: '#888' }}>
-          Layer Properties
-        </h3>
-
-        {selectedLayerId ? (
-          (() => {
-            const selectedLayer = layers.find((ls) => ls.layer.id === selectedLayerId)?.layer;
-            if (!selectedLayer) return null;
-
-            return (
-              <div>
-                <label
-                  style={{
-                    display: 'block',
-                    marginBottom: '0.5rem',
-                    fontSize: '0.75rem',
-                    color: '#888',
-                  }}
-                >
-                  Name
-                </label>
-                <input
-                  type="text"
-                  value={selectedLayer.name}
-                  onChange={(e) => updateLayer(selectedLayerId, { name: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem',
-                    background: '#222238',
-                    border: '1px solid #333',
-                    borderRadius: '6px',
-                    color: '#fff',
-                    marginBottom: '1rem',
-                  }}
-                />
-
-                <label
-                  style={{
-                    display: 'block',
-                    marginBottom: '0.5rem',
-                    fontSize: '0.75rem',
-                    color: '#888',
-                  }}
-                >
-                  Opacity: {Math.round(selectedLayer.opacity * 100)}%
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value={selectedLayer.opacity}
-                  onChange={(e) =>
-                    updateLayer(selectedLayerId, { opacity: parseFloat(e.target.value) })
-                  }
-                  style={{ width: '100%', marginBottom: '1rem' }}
-                />
-
-                <label
-                  style={{
-                    display: 'block',
-                    marginBottom: '0.5rem',
-                    fontSize: '0.75rem',
-                    color: '#888',
-                  }}
-                >
-                  Blend Mode
-                </label>
-                <select
-                  value={selectedLayer.blendMode}
-                  onChange={(e) =>
-                    updateLayer(selectedLayerId, { blendMode: e.target.value as BlendMode })
-                  }
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem',
-                    background: '#222238',
-                    border: '1px solid #333',
-                    borderRadius: '6px',
-                    color: '#fff',
-                    marginBottom: '1rem',
-                  }}
-                >
-                  {blendModes.map((mode) => (
-                    <option key={mode} value={mode}>
-                      {mode}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            );
-          })()
-        ) : (
-          <p style={{ color: '#666', fontSize: '0.85rem' }}>
-            Select a layer to edit its properties
-          </p>
-        )}
-
-        {generatedCode && (
-          <div style={{ marginTop: '1rem' }}>
-            <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.75rem', color: '#888' }}>
-              Generated WGSL
-            </h4>
-            <pre
+              key={`${effect.layerType}-${effect.effect}`}
+              onClick={() => addLayer(effect.layerType, effect.effect)}
               style={{
                 padding: '0.75rem',
-                background: '#222238',
+                background: '#2a2a3e',
+                color: '#ccc',
+                border: 'none',
                 borderRadius: '6px',
-                fontSize: '0.65rem',
-                overflow: 'auto',
-                maxHeight: '200px',
+                cursor: 'pointer',
+                textAlign: 'left',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
               }}
             >
-              {generatedCode}
+              <span>{effect.icon}</span>
+              <span>{effect.name}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Center Panel - Layer Stack */}
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
+          <h3 style={{ margin: 0, fontWeight: 500 }}>Layer Stack</h3>
+          <button
+            onClick={compileStack}
+            disabled={layers.length === 0}
+            style={{
+              padding: '0.5rem 1rem',
+              background: layers.length > 0 ? '#4a9eff' : '#333',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: layers.length > 0 ? 'pointer' : 'not-allowed',
+            }}
+          >
+            🔧 Compile Stack
+          </button>
+        </div>
+
+        {layers.length === 0 ? (
+          <div
+            style={{
+              padding: '3rem',
+              background: '#1a1a2e',
+              borderRadius: '8px',
+              textAlign: 'center',
+              color: '#666',
+            }}
+          >
+            No layers yet. Add effects from the left panel.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {layers.map((layer, index) => (
+              <div
+                key={layer.id}
+                onClick={() => setSelectedLayerId(layer.id)}
+                style={{
+                  padding: '0.75rem',
+                  background: selectedLayerId === layer.id ? '#2a3a5e' : '#1a1a2e',
+                  border: selectedLayerId === layer.id ? '1px solid #4a9eff' : '1px solid #333',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  opacity: layer.visible ? 1 : 0.5,
+                }}
+              >
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    updateLayer(layer.id, { visible: !layer.visible });
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '1rem',
+                  }}
+                >
+                  {layer.visible ? '👁️' : '👁️‍🗨️'}
+                </button>
+
+                <span style={{ flex: 1 }}>{layer.name}</span>
+
+                <span style={{ color: '#888', fontSize: '0.8rem' }}>
+                  {Math.round(layer.opacity * 100)}%
+                </span>
+
+                <div style={{ display: 'flex', gap: '0.25rem' }}>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      moveLayer(layer.id, 'up');
+                    }}
+                    disabled={index === 0}
+                    style={{
+                      background: '#333',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '0.25rem 0.5rem',
+                      cursor: index === 0 ? 'not-allowed' : 'pointer',
+                      opacity: index === 0 ? 0.5 : 1,
+                    }}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      moveLayer(layer.id, 'down');
+                    }}
+                    disabled={index === layers.length - 1}
+                    style={{
+                      background: '#333',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '0.25rem 0.5rem',
+                      cursor: index === layers.length - 1 ? 'not-allowed' : 'pointer',
+                      opacity: index === layers.length - 1 ? 0.5 : 1,
+                    }}
+                  >
+                    ↓
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeLayer(layer.id);
+                    }}
+                    style={{
+                      background: '#4a2a2a',
+                      border: 'none',
+                      borderRadius: '4px',
+                      padding: '0.25rem 0.5rem',
+                      cursor: 'pointer',
+                      color: '#f88',
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {compiledOutput && (
+          <div style={{ marginTop: '1.5rem' }}>
+            <h4 style={{ margin: '0 0 0.5rem 0' }}>Compiled Shader:</h4>
+            <pre
+              style={{
+                padding: '1rem',
+                background: '#1a1a2e',
+                borderRadius: '8px',
+                fontSize: '0.75rem',
+                overflow: 'auto',
+                maxHeight: '200px',
+                margin: 0,
+              }}
+            >
+              {compiledOutput}
             </pre>
+          </div>
+        )}
+      </div>
+
+      {/* Right Panel - Layer Properties */}
+      <div>
+        <h3 style={{ margin: '0 0 1rem 0', fontWeight: 500 }}>Properties</h3>
+
+        {!selectedLayer ? (
+          <div
+            style={{
+              padding: '2rem',
+              background: '#1a1a2e',
+              borderRadius: '8px',
+              color: '#666',
+              textAlign: 'center',
+            }}
+          >
+            Select a layer to edit its properties
+          </div>
+        ) : (
+          <div
+            style={{
+              padding: '1rem',
+              background: '#1a1a2e',
+              borderRadius: '8px',
+            }}
+          >
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', color: '#888' }}>
+                Layer Name
+              </label>
+              <input
+                type="text"
+                value={selectedLayer.name}
+                onChange={(e) => updateLayer(selectedLayer.id, { name: e.target.value })}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  background: '#2a2a3e',
+                  border: '1px solid #333',
+                  borderRadius: '4px',
+                  color: '#fff',
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', color: '#888' }}>
+                Opacity: {Math.round(selectedLayer.opacity * 100)}%
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={selectedLayer.opacity * 100}
+                onChange={(e) =>
+                  updateLayer(selectedLayer.id, { opacity: parseInt(e.target.value) / 100 })
+                }
+                style={{ width: '100%' }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', color: '#888' }}>
+                Blend Mode
+              </label>
+              <select
+                value={selectedLayer.blendMode}
+                onChange={(e) =>
+                  updateLayer(selectedLayer.id, { blendMode: e.target.value as BlendMode })
+                }
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  background: '#2a2a3e',
+                  border: '1px solid #333',
+                  borderRadius: '4px',
+                  color: '#fff',
+                }}
+              >
+                {BLEND_MODES.map((mode) => (
+                  <option key={mode} value={mode}>
+                    {mode.charAt(0).toUpperCase() + mode.slice(1).replace(/-/g, ' ')}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         )}
       </div>
