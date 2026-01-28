@@ -7,6 +7,9 @@ const CATEGORY_INFO: Record<PresetCategory, { icon: string; label: string }> = {
   gaming: { icon: '🎮', label: 'Gaming' },
   motion: { icon: '🎞️', label: 'Motion Graphics' },
   artistic: { icon: '🎨', label: 'Artistic' },
+  color: { icon: '🎨', label: 'Color Grading' },
+  vintage: { icon: '📼', label: 'Vintage' },
+  modern: { icon: '✨', label: 'Modern' },
 };
 
 export function PresetGallery() {

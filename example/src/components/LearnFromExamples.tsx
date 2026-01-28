@@ -79,8 +79,8 @@ export function LearnFromExamples() {
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
       // Analyze the image
-      const result = analyzerRef.current!.analyze(imageData);
-      setAnalysis(result);
+      const result = await analyzerRef.current!.analyze(imageData);
+      if (isMounted.current) setAnalysis(result);
 
       // Synthesize layers from analysis
       const layers = synthesizerRef.current!.synthesize(result);
@@ -277,7 +277,7 @@ export function LearnFromExamples() {
                   ))}
                 </div>
                 <div style={{ fontSize: '0.85rem', color: '#aaa' }}>
-                  Temperature: {analysis.colorProfile.temperature.toFixed(2)} • Saturation:{' '}
+                  Brightness: {(analysis.colorProfile.brightness * 100).toFixed(0)}% • Saturation:{' '}
                   {(analysis.colorProfile.saturation * 100).toFixed(0)}%
                 </div>
               </div>
@@ -306,19 +306,19 @@ export function LearnFromExamples() {
                   <div>
                     <div style={{ color: '#888', fontSize: '0.75rem' }}>Shadows</div>
                     <div style={{ fontSize: '1.25rem', fontWeight: 600 }}>
-                      {(analysis.toneProfile.shadows * 100).toFixed(0)}%
+                      {(analysis.toneProfile.dark * 100).toFixed(0)}%
                     </div>
                   </div>
                   <div>
                     <div style={{ color: '#888', fontSize: '0.75rem' }}>Midtones</div>
                     <div style={{ fontSize: '1.25rem', fontWeight: 600 }}>
-                      {(analysis.toneProfile.midtones * 100).toFixed(0)}%
+                      {(analysis.toneProfile.mid * 100).toFixed(0)}%
                     </div>
                   </div>
                   <div>
                     <div style={{ color: '#888', fontSize: '0.75rem' }}>Highlights</div>
                     <div style={{ fontSize: '1.25rem', fontWeight: 600 }}>
-                      {(analysis.toneProfile.highlights * 100).toFixed(0)}%
+                      {(analysis.toneProfile.light * 100).toFixed(0)}%
                     </div>
                   </div>
                 </div>

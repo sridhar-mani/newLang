@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { LayerComposition, createLayer, compileLayerStack } from '@shader3d/layers';
+import { LayerComposition, createLayer } from '@shader3d/layers';
 import type { BlendMode, EffectLayer } from '@shader3d/layers';
 
 // Available blend modes

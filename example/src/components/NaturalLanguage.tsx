@@ -217,7 +217,7 @@ export function NaturalLanguage() {
                                 borderRadius: '3px',
                                 border: '1px solid #555',
                               }}
-                              title={c.name}
+                              title={typeof c === 'string' ? c : 'color'}
                             />
                           ))}
                         </div>
@@ -245,8 +245,7 @@ export function NaturalLanguage() {
                         fontSize: '0.85rem',
                       }}
                     >
-                      {mod.word} ({mod.effect}: {mod.value > 0 ? '+' : ''}
-                      {Math.round(mod.value * 100)}%)
+                      {mod.word} ({typeof mod.value === 'number' ? (mod.value > 0 ? '+' : '') + Math.round(mod.value * 100) : mod.value}%)
                     </span>
                   ))}
                 </div>

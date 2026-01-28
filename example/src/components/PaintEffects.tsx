@@ -83,7 +83,11 @@ export function PaintEffects() {
     }
 
     // Recognize the gesture
-    const gesture = recognizerRef.current?.recognize(currentStroke) ?? null;
+    const gesture = recognizerRef.current?.recognize({ 
+      points: currentStroke, 
+      startTime: Date.now(), 
+      endTime: Date.now() 
+    }) ?? null;
 
     const stroke: Stroke = {
       id: crypto.randomUUID(),
