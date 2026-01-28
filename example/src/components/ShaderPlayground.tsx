@@ -14,7 +14,8 @@ const EXAMPLE_SHADERS = {
 
   typedVariables: {
     name: 'Type-Safe Gradients',
-    description: 'Demonstrates TypeScript-style explicit type annotations and const declarations for safer shader code.',
+    description:
+      'Demonstrates TypeScript-style explicit type annotations and const declarations for safer shader code.',
     code: `// TypeScript Feature: Explicit Type Annotations
 // Unlike raw WGSL, Shader3D lets you use familiar TypeScript type syntax
 // This prevents type mismatches at compile time, not GPU runtime!
@@ -39,7 +40,8 @@ function main(uv: vec2f): vec4f {
 
   helperFunctions: {
     name: 'Reusable Helper Functions',
-    description: 'Shows how TypeScript-style function definitions with typed parameters enable modular, reusable shader code.',
+    description:
+      'Shows how TypeScript-style function definitions with typed parameters enable modular, reusable shader code.',
     code: `// TypeScript Feature: Typed Function Declarations
 // Write reusable helper functions just like in TypeScript!
 // Functions have clear parameter types and return types.
@@ -82,7 +84,8 @@ function main(uv: vec2f): vec4f {
 
   structuredData: {
     name: 'Struct-Based Organization',
-    description: 'Leverages TypeScript-style struct definitions for organizing complex shader data with named fields.',
+    description:
+      'Leverages TypeScript-style struct definitions for organizing complex shader data with named fields.',
     code: `// TypeScript Feature: Struct Definitions
 // Define structured types for complex shader data
 // Just like TypeScript interfaces, but for GPU data!
@@ -147,7 +150,8 @@ function main(uv: vec2f): vec4f {
 
   animatedPatterns: {
     name: 'Animated Math Patterns',
-    description: 'Uses Math.* functions (auto-mapped to WGSL) and auto-detected time uniform for dynamic visuals.',
+    description:
+      'Uses Math.* functions (auto-mapped to WGSL) and auto-detected time uniform for dynamic visuals.',
     code: `// TypeScript Feature: Math.* Function Mapping
 // Use familiar JavaScript Math functions - Shader3D maps them to WGSL!
 // The 'time' uniform is auto-detected and injected automatically.
@@ -202,7 +206,8 @@ function main(uv: vec2f): vec4f {
 
   conditionalLogic: {
     name: 'Conditional Shader Logic',
-    description: 'Demonstrates if/else branching with comparison operators for creating complex procedural effects.',
+    description:
+      'Demonstrates if/else branching with comparison operators for creating complex procedural effects.',
     code: `// TypeScript Feature: Familiar Control Flow
 // Use if/else, for loops, and comparison operators just like TypeScript!
 // Much more readable than WGSL's select() or step() gymnastics.
@@ -275,7 +280,8 @@ function main(uv: vec2f): vec4f {
 
   proceduralNoise: {
     name: 'Procedural Noise Generator',
-    description: 'Advanced shader demonstrating function composition, loops, and mathematical patterns for procedural generation.',
+    description:
+      'Advanced shader demonstrating function composition, loops, and mathematical patterns for procedural generation.',
     code: `// TypeScript Feature: Function Composition & Reusability
 // Build complex effects by composing simple, well-typed functions.
 // This modular approach makes shaders maintainable and debuggable!
@@ -360,7 +366,8 @@ function main(uv: vec2f): vec4f {
 
   interactiveRaymarching: {
     name: 'Interactive Raymarching',
-    description: 'Showcases mouse interaction, complex math, and performance-optimized loops for 3D rendering on the GPU.',
+    description:
+      'Showcases mouse interaction, complex math, and performance-optimized loops for 3D rendering on the GPU.',
     code: `// TypeScript Feature: Complex Algorithm Implementation
 // Shader3D makes implementing raymarching clean and maintainable.
 // Uses auto-detected 'mouse' and 'resolution' uniforms!
