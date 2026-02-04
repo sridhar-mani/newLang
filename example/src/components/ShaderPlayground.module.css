@@ -1,0 +1,17 @@
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+.banner { background: #1a4a1a; color: #8f8; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; }
+.bannerText { font-size: 0.85rem; margin-top: 0.5rem; opacity: 0.9; }
+.btnGroup { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+.btn { padding: 0.5rem 1rem; background: #2a2a3e; color: #aaa; border: none; border-radius: 6px; cursor: pointer; }
+.btn.active { background: #4a9eff; color: #fff; }
+.card { background: #1a1a2e; padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem; }
+.cardTitle { margin: 0 0 1rem 0; }
+.cardDesc { color: #888; margin: 0 0 1rem 0; }
+.cardConfig { font-size: 0.9rem; color: #aaa; }
+.pre { margin: 0.5rem 0 0 0; background: #0d0d14; padding: 0.75rem; border-radius: 4px; }
+.genBtn { padding: 0.75rem 2rem; background: #4a9eff; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
+.outputTitle { margin: 0 0 1rem 0; }
+.placeholder { padding: 2rem; text-align: center; color: #888; }
+.success { padding: 0.75rem; background: #1a4a1a; color: #8f8; border-radius: 8px; margin-bottom: 1rem; }
+.output { padding: 1rem; background: #1a1a2e; border-radius: 8px; font-size: 0.8rem; overflow: auto; max-height: 400px; margin: 0; border: 1px solid #333; }
+.error { padding: 1rem; background: #4a1a1a; color: #f88; border-radius: 8px; }

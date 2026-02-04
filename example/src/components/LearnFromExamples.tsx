@@ -1,54 +1,75 @@
 import { useState } from 'react';
 
-const SAMPLE_IMAGES = [
+const SAMPLE_STYLES = [
   {
     name: 'Golden Hour',
-    url: 'https://images.unsplash.com/photo-1507400492013-162706c8c05e?w=200',
     icon: '🌅',
+    analysis: {
+      colors: ['Warm', 'Golden', 'Soft'],
+      effects: ['Brightness +15%', 'Saturation +5%', 'Vignette'],
+    },
   },
   {
     name: 'Portrait',
-    url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200',
     icon: '👤',
+    analysis: {
+      colors: ['Neutral', 'Skin tones', 'Sharp'],
+      effects: ['Clarity +20%', 'Softness 0.5px', 'Eyes +10%'],
+    },
   },
   {
     name: 'Vintage',
-    url: 'https://images.unsplash.com/photo-1518173946687-a4c036bc3c95?w=200',
     icon: '📼',
+    analysis: {
+      colors: ['Faded', 'Sepia', 'Grain'],
+      effects: ['Contrast -10%', 'Grain 20%', 'Vignette 30%'],
+    },
   },
   {
-    name: 'Mountain',
-    url: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=200',
+    name: 'Landscape',
     icon: '⛰️',
+    analysis: {
+      colors: ['Vivid', 'Blue', 'Green'],
+      effects: ['HDR +25%', 'Dehaze +15%', 'Vibrance +20%'],
+    },
+  },
+  {
+    name: 'Night',
+    icon: '🌙',
+    analysis: {
+      colors: ['Dark', 'Neon', 'Contrast'],
+      effects: ['Shadows +30%', 'Highlights -20%', 'Clarity +15%'],
+    },
+  },
+  {
+    name: 'Minimal',
+    icon: '⬜',
+    analysis: {
+      colors: ['Clean', 'White', 'Subtle'],
+      effects: ['Exposure +10%', 'Whites +20%', 'Fade 5%'],
+    },
   },
 ];
 
 export function LearnFromExamples() {
   const [selected, setSelected] = useState<string | null>(null);
-  const [analysis, setAnalysis] = useState<{ colors: string[]; effects: string[] } | null>(null);
 
-  const analyze = async (name: string) => {
-    setSelected(name);
-    setAnalysis({
-      colors: ['Warm', 'Golden', 'Soft'],
-      effects: ['Brightness +15%', 'Saturation +5%', 'Vignette'],
-    });
-  };
+  const selectedStyle = SAMPLE_STYLES.find((s) => s.name === selected);
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
       <div>
-        <h3 style={{ margin: '0 0 1rem 0', fontSize: '0.95rem' }}>Sample Images:</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
-          {SAMPLE_IMAGES.map((img) => (
+        <h3 style={{ margin: '0 0 1rem 0', fontSize: '0.95rem' }}>Style Examples:</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
+          {SAMPLE_STYLES.map((style) => (
             <button
-              key={img.name}
-              onClick={() => analyze(img.name)}
+              key={style.name}
+              onClick={() => setSelected(style.name)}
               style={{
                 aspectRatio: '1',
-                padding: 0,
-                background: selected === img.name ? '#2a3a5e' : '#2a2a3e',
-                border: selected === img.name ? '2px solid #4a9eff' : '1px solid #333',
+                padding: '0.5rem',
+                background: selected === style.name ? '#2a3a5e' : '#2a2a3e',
+                border: selected === style.name ? '2px solid #4a9eff' : '1px solid #333',
                 borderRadius: '8px',
                 cursor: 'pointer',
                 display: 'flex',
@@ -58,8 +79,8 @@ export function LearnFromExamples() {
                 color: '#fff',
               }}
             >
-              <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>{img.icon}</div>
-              <div style={{ fontSize: '0.85rem', fontWeight: 500 }}>{img.name}</div>
+              <div style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>{style.icon}</div>
+              <div style={{ fontSize: '0.75rem', fontWeight: 500 }}>{style.name}</div>
             </button>
           ))}
         </div>
@@ -94,7 +115,7 @@ export function LearnFromExamples() {
 
       <div>
         <h3 style={{ margin: '0 0 1rem 0', fontSize: '0.95rem' }}>Analysis</h3>
-        {!analysis ? (
+        {!selectedStyle ? (
           <div
             style={{
               padding: '2rem',
@@ -104,7 +125,7 @@ export function LearnFromExamples() {
               color: '#666',
             }}
           >
-            Select an image to analyze
+            Select a style to analyze
           </div>
         ) : (
           <div>
@@ -113,7 +134,7 @@ export function LearnFromExamples() {
                 Detected Colors:
               </h4>
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                {analysis.colors.map((color) => (
+                {selectedStyle.analysis.colors.map((color) => (
                   <div
                     key={color}
                     style={{
@@ -134,7 +155,7 @@ export function LearnFromExamples() {
                 Suggested Effects:
               </h4>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {analysis.effects.map((effect, i) => (
+                {selectedStyle.analysis.effects.map((effect, i) => (
                   <div
                     key={i}
                     style={{

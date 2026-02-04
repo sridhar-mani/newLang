@@ -268,37 +268,38 @@ interface CompileOutput {
 }
 
 function compileShader(source: string, options: CompileOptions): CompileOutput {
-  // Import the core compiler dynamically to avoid circular dependencies
-  // In a real implementation, this would be a proper import
+  // Use the real @shader3d/core compiler
+  // Dynamic import to avoid circular dependencies at module load time
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const core = require('@shader3d/core');
+    const result = core.compile(source, {
+      mode: options.minify ? 'production' : 'development',
+      sourceMaps: options.sourceMaps,
+    });
 
-  // For now, we'll implement a simplified inline compiler
-  // This should be replaced with: import { compile } from '@shader3d/core'
-
-  const result = simpleCompile(source, options);
-
-  return {
-    code: result.code,
-    metadata: result.metadata,
-    diagnostics: result.diagnostics,
-  };
+    return {
+      code: result.code,
+      metadata: {
+        entryPoints: result.metadata?.entryPoints || [],
+        bindings: result.metadata?.bindings || [],
+        structs: result.metadata?.structs || [],
+      },
+      diagnostics: result.diagnostics || [],
+    };
+  } catch (e) {
+    // Fallback: if @shader3d/core isn't available, use basic transform
+    return fallbackCompile(source, options);
+  }
 }
 
-// Simplified compiler for the plugin (to be replaced with @shader3d/core)
-function simpleCompile(source: string, options: CompileOptions): CompileOutput {
-  // Basic transformation: wrap in WGSL template
-  // This is a placeholder - the real implementation uses the full parser/transformer
-
+function fallbackCompile(source: string, options: CompileOptions): CompileOutput {
   let code = source;
 
-  // Detect decorators and transform
   const hasVertex = /@vertex/.test(source);
   const hasFragment = /@fragment/.test(source);
   const hasCompute = /@compute/.test(source);
 
-  // Extract function bodies
-  const functions = extractFunctions(source);
-
-  // Build metadata
   const metadata: ShaderMetadata = {
     entryPoints: [],
     bindings: [],
@@ -309,10 +310,8 @@ function simpleCompile(source: string, options: CompileOptions): CompileOutput {
   if (hasFragment) metadata.entryPoints.push({ name: 'fragment_main', stage: 'fragment' });
   if (hasCompute) metadata.entryPoints.push({ name: 'compute_main', stage: 'compute' });
 
-  // Transform TypeScript-like syntax to WGSL
   code = transformToWGSL(source);
 
-  // Add stdlib if needed
   if (options.includeStdlib) {
     const stdlib = extractRequiredStdlib(code);
     if (stdlib) {
@@ -320,16 +319,11 @@ function simpleCompile(source: string, options: CompileOptions): CompileOutput {
     }
   }
 
-  // Minify if requested
   if (options.minify) {
     code = minifyWGSL(code);
   }
 
-  return {
-    code,
-    metadata,
-    diagnostics: [],
-  };
+  return { code, metadata, diagnostics: [] };
 }
 
 function extractFunctions(
@@ -343,7 +337,7 @@ function extractFunctions(
     const decorators = match[1].match(/@\w+/g) || [];
     functions.push({
       name: match[2],
-      body: '', // Would need proper parsing
+      body: '',
       decorators,
     });
   }

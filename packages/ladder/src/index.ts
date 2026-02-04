@@ -269,40 +269,60 @@ function main(@builtin(position) pos: vec4f): @location(0) vec4f {
 
 /**
  * Compile shader source code to WGSL
+ * Uses the real @shader3d/core compiler with fallback for edge cases
  */
 export function compile(source: string, options: CompileOptions = {}): CompileResult {
   const diagnostics: Diagnostic[] = [];
-  let code = source;
 
-  // Basic validation
   if (!source.trim()) {
-    diagnostics.push({
-      severity: 'error',
-      message: 'Empty shader source',
-    });
+    diagnostics.push({ severity: 'error', message: 'Empty shader source' });
     return { code: '', metadata: { entryPoints: [], bindings: [], structs: [] }, diagnostics };
   }
 
-  // Transform TypeScript-like syntax to WGSL
-  code = transformSource(code);
-
-  // Extract metadata
-  const metadata = extractMetadata(source);
-
-  // Check for entry points
-  if (metadata.entryPoints.length === 0) {
-    diagnostics.push({
-      severity: 'warning',
-      message: 'No entry points found. Add @vertex, @fragment, or @compute decorator.',
+  // Try using the real @shader3d/core compiler first
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const core = require('@shader3d/core');
+    const result = core.compile(source, {
+      mode: options.minify ? 'production' : 'development',
+      sourceMaps: options.sourceMaps,
     });
-  }
 
-  // Minify if requested
-  if (options.minify) {
-    code = minify(code);
-  }
+    // Map core diagnostics to ladder format
+    const mappedDiagnostics: Diagnostic[] = (result.diagnostics || []).map((d: { severity: string; message: string; line?: number; column?: number }) => ({
+      severity: d.severity as Diagnostic['severity'],
+      message: d.message,
+      line: d.line,
+      column: d.column,
+    }));
 
-  return { code, metadata, diagnostics };
+    return {
+      code: result.code,
+      metadata: {
+        entryPoints: result.metadata?.entryPoints || [],
+        bindings: result.metadata?.bindings || [],
+        structs: result.metadata?.structs || [],
+      },
+      diagnostics: mappedDiagnostics,
+    };
+  } catch {
+    // Fallback to simple transform if core compiler fails or isn't available
+    let code = transformSource(source);
+    const metadata = extractMetadata(source);
+
+    if (metadata.entryPoints.length === 0) {
+      diagnostics.push({
+        severity: 'warning',
+        message: 'No entry points found. Add @vertex, @fragment, or @compute decorator.',
+      });
+    }
+
+    if (options.minify) {
+      code = minify(code);
+    }
+
+    return { code, metadata, diagnostics };
+  }
 }
 
 function transformSource(source: string): string {

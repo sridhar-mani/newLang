@@ -30,15 +30,15 @@
         "hmr",
         "graphics"
     ],
-    "author": "Shader3D Team",
+    "author": "Sridhar Mani",
     "license": "SEE LICENSE IN ../../LICENSE",
     "repository": {
         "type": "git",
-        "url": "https://github.com/shader3d/shader3d.git",
+        "url": "https://github.com/sridhar-mani/shader3d.git",
         "directory": "packages/vite-plugin"
     },
     "bugs": {
-        "url": "https://github.com/shader3d/shader3d/issues"
+        "url": "https://github.com/sridhar-mani/shader3d/issues"
     },
     "homepage": "https://shader3d.dev",
     "dependencies": {

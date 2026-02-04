@@ -37,15 +37,15 @@
         "graphics",
         "runtime"
     ],
-    "author": "Shader3D Team",
+    "author": "Sridhar Mani",
     "license": "SEE LICENSE IN ../../LICENSE",
     "repository": {
         "type": "git",
-        "url": "https://github.com/shader3d/shader3d.git",
+        "url": "https://github.com/sridhar-mani/shader3d.git",
         "directory": "packages/runtime"
     },
     "bugs": {
-        "url": "https://github.com/shader3d/shader3d/issues"
+        "url": "https://github.com/sridhar-mani/shader3d/issues"
     },
     "homepage": "https://shader3d.dev",
     "devDependencies": {

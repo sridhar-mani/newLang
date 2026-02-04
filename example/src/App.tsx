@@ -16,26 +16,36 @@ interface Tab {
 }
 
 const tabs: Tab[] = [
-  { id: 'playground', label: 'Playground', icon: '🎮', description: 'Write shaders in TypeScript' },
-  {
-    id: 'layers',
-    label: 'Effect Layers',
-    icon: '📚',
-    description: 'Photoshop-style effect stacking',
-  },
   { id: 'presets', label: 'Presets', icon: '✨', description: 'One-click professional effects' },
+  {
+    id: 'learn',
+    label: 'Learn from Examples',
+    icon: '📷',
+    description: 'Upload images, match any style',
+  },
   {
     id: 'paint',
     label: 'Paint Effects',
     icon: '🎨',
     description: 'Draw gestures to create effects',
   },
+  {
+    id: 'layers',
+    label: 'Effect Layers',
+    icon: '📚',
+    description: 'Photoshop-style effect stacking',
+  },
   { id: 'talk', label: 'Talk to Me', icon: '💬', description: 'Describe effects in plain English' },
-  { id: 'learn', label: 'Show Me', icon: '📷', description: 'Learn from example images' },
+  {
+    id: 'playground',
+    label: 'Playground',
+    icon: '🎮',
+    description: 'Advanced: Write custom shaders',
+  },
 ];
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<TabId>('playground');
+  const [activeTab, setActiveTab] = useState<TabId>('presets');
 
   const renderContent = () => {
     switch (activeTab) {
@@ -76,10 +86,28 @@ export default function App() {
         <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600 }}>
           <span style={{ color: '#4a9eff' }}>Shader</span>3D
         </h1>
-        <span style={{ color: '#666', fontSize: '0.9rem' }}>
-          The Progressive Graphics Programming Library
+        <span style={{ color: '#888', fontSize: '0.9rem' }}>
+          Create Professional Shader Effects Without Knowing Shaders
         </span>
       </header>
+
+      <div
+        style={{
+          display: 'flex',
+          gap: '1.5rem',
+          padding: '0.75rem 2rem',
+          background: '#0d0d14',
+          borderBottom: '1px solid #222',
+          fontSize: '0.8rem',
+          color: '#888',
+          flexWrap: 'wrap',
+        }}
+      >
+        <span>🎨 Draw gestures → Get effects</span>
+        <span>📸 Upload examples → Match style</span>
+        <span>💬 Describe in English → Get shader</span>
+        <span>⚡ 50+ one-click presets</span>
+      </div>
 
       <nav
         style={{
@@ -144,7 +172,7 @@ export default function App() {
         </p>
         <p style={{ margin: '0.5rem 0' }}>
           <a
-            href="https://github.com/sridhar-mani/newLang"
+            href="https://github.com/sridhar-mani/shader3d"
             style={{ color: '#4a9eff', textDecoration: 'none' }}
           >
             GitHub

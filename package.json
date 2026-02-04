@@ -34,11 +34,11 @@
     "dsl",
     "transpiler"
   ],
-  "author": "Shader3D Team",
+  "author": "Sridhar Mani",
   "license": "SEE LICENSE IN LICENSE",
   "repository": {
     "type": "git",
-    "url": "https://github.com/shader3d/shader3d.git"
+    "url": "https://github.com/sridhar-mani/shader3d.git"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",

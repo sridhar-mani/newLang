@@ -18,20 +18,19 @@
         "shader",
         "webgpu",
         "wgsl",
-        "glsl",
         "graphics",
         "3d",
         "dsl",
         "transpiler"
     ],
-    "author": "Shader3D Team",
+    "author": "Sridhar Mani",
     "license": "MIT",
     "repository": {
         "type": "git",
-        "url": "https://github.com/shader3d/shader3d.git"
+        "url": "https://github.com/sridhar-mani/shader3d.git"
     },
     "bugs": {
-        "url": "https://github.com/shader3d/shader3d/issues"
+        "url": "https://github.com/sridhar-mani/shader3d/issues"
     },
     "homepage": "https://shader3d.dev",
     "devDependencies": {
