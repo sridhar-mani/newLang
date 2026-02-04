@@ -21,10 +21,10 @@
     "react-dom": ">=18.0.0"
   },
   "dependencies": {
-    "@shader3d/core": "workspace:*",
-    "@shader3d/runtime": "workspace:*",
-    "@shader3d/presets": "workspace:*",
-    "@shader3d/layers": "workspace:*"
+    "@shader3d/core": "*",
+    "@shader3d/runtime": "*",
+    "@shader3d/presets": "*",
+    "@shader3d/layers": "*"
   },
   "devDependencies": {
     "@types/react": "^18.0.0",

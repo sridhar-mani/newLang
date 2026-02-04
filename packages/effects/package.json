@@ -17,13 +17,13 @@
     "dev": "tsup src/index.ts --format cjs,esm --dts --watch"
   },
   "dependencies": {
-    "@shader3d/core": "workspace:*",
-    "@shader3d/runtime": "workspace:*",
-    "@shader3d/presets": "workspace:*",
-    "@shader3d/layers": "workspace:*",
-    "@shader3d/natural-language": "workspace:*",
-    "@shader3d/paint-effects": "workspace:*",
-    "@shader3d/learn-from-examples": "workspace:*"
+    "@shader3d/core": "*",
+    "@shader3d/runtime": "*",
+    "@shader3d/presets": "*",
+    "@shader3d/layers": "*",
+    "@shader3d/natural-language": "*",
+    "@shader3d/paint-effects": "*",
+    "@shader3d/learn-from-examples": "*"
   },
   "devDependencies": {
     "tsup": "^8.0.0",

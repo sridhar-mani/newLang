@@ -28,7 +28,6 @@
     "shader",
     "webgpu",
     "wgsl",
-    "glsl",
     "graphics",
     "3d",
     "dsl",
